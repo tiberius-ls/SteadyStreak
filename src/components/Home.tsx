@@ -103,8 +103,10 @@ export function Home() {
             {formatNim(cycle.dailySaveLuna + cycle.dailyStakeLuna)} NIM
           </strong>{" "}
           (save {formatNim(cycle.dailySaveLuna)} + stake{" "}
-          {formatNim(cycle.dailyStakeLuna)}) in one tagged transaction.
-          {client?.isMock ? " · demo mode" : ""}
+          {formatNim(cycle.dailyStakeLuna)}) to escrow in one tx.
+          {client?.isMock
+            ? " · demo mode (simulated)"
+            : " · needs enough NIM in this wallet"}
         </p>
         {client?.isMock && cycle.status === "active" ? (
           <Button
