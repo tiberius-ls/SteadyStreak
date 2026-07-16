@@ -1,7 +1,9 @@
 {
-  "name": "nimiq",
-  "version": "0.1.0",
+  "name": "steadystreak",
+  "version": "1.0.0",
   "private": true,
+  "license": "MIT",
+  "description": "SteadyStreak — Nimiq Pay mini app for habit streaks with safe savings and competitive staking",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -9,6 +11,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@nimiq/mini-app-sdk": "^0.1.0",
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4"

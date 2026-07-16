@@ -1,36 +1,115 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SteadyStreak
 
-## Getting Started
+**Habit tracking + safe NIM savings + competitive staking** — a [Nimiq Pay](https://nimiq.com/nimiq-pay) Mini App.
 
-First, run the development server:
+Every day you complete your habit, you send **one combined NIM transaction**:
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+| Part | Risk | Outcome |
+|------|------|---------|
+| **Save** | Zero | Always returned to you at cycle end |
+| **Stake** | At risk | Forfeited to a shared pool if you break the streak |
+
+Survivors who finish the full cycle split the forfeited stake pool with a streak multiplier.
+
+## Why it fits Nimiq Pay
+
+- Wallet connect via `@nimiq/mini-app-sdk` (`init()` + `listAccounts`)
+- Daily check-in is a real **`sendBasicTransactionWithData`** (save + stake, tagged with cycle ID + day)
+- Native confirmation dialogs inside Nimiq Pay — no browser extension friction
+- Mobile-first UI designed for the embedded Mini App WebView
+
+## Screens
+
+1. **Onboarding** — connect wallet, pick habit, choose 30 / 60 / 90 days  
+2. **Setup** — daily save & stake amounts, full-cycle commitment preview  
+3. **Home** — **Mark done**, streak, days left, private savings, pool rank  
+4. **Leaderboard** — public rank by streak only (never shows savings) + Bronze / Silver / Gold  
+5. **Payout** — savings principal, stake pool share, start a new cycle  
+
+## Core logic
+
+- Check-in only counts if the tx confirms **before midnight local time**
+- Missed day → streak breaks → stakes for that cycle move to the shared pool; **savings stay reserved**
+- At cycle end for survivors:
+
+```text
+multiplier = min(3, streak_days / cycle_length * 3)
+weight     = own_stake * multiplier
+bonus      = total_forfeited * weight / sum(weights)
+payout     = savings_principal + own_stake + bonus
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Broken users receive **savings principal only**.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Tech stack
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Next.js 16 (App Router) + TypeScript + Tailwind CSS v4
+- `@nimiq/mini-app-sdk` for Nimiq Pay wallet integration
+- Client `localStorage` for personal cycles / check-ins / payouts
+- API routes for public leaderboard + shared stake pools
+- Deployable on Vercel
 
-## Learn More
+## Quick start
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm install
+cp .env.example .env.local   # optional: set NEXT_PUBLIC_ESCROW_ADDRESS
+npm run dev
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Demo mode (browser)
 
-## Deploy on Vercel
+If you are **not** inside Nimiq Pay, use **Continue with demo wallet**.  
+Check-ins simulate NIM transactions so you can exercise the full product flow.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### Inside Nimiq Pay
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Deploy or tunnel the app (HTTPS)
+2. Open: `nimiqpay://miniapp?url=YOUR_HOST`
+3. Connect → set habit & amounts → **Mark done** each day
+
+## Environment
+
+| Variable | Description |
+|----------|-------------|
+| `NEXT_PUBLIC_ESCROW_ADDRESS` | Nimiq address receiving daily save+stake txs |
+
+Payout **claims** are recorded in-app with a full breakdown. Production escrow **releases** should be operated by a pool operator wallet that matches the escrow address (not shipped with private keys in this repo).
+
+## Data model
+
+- `users` — wallet address, id  
+- `cycles` — length, start_date, daily save/stake, status, pool cohort  
+- `checkins` — day_number, tx_hash, save/stake amounts  
+- `stakes_pool` — poolId, total_forfeited  
+- `payouts` — amount breakdown + claim reference  
+
+Personal data lives on-device; leaderboard / pool state use server API routes (in-memory process store — swap for Redis/Postgres for multi-region production).
+
+## Tier badges
+
+| Tier | Streak |
+|------|--------|
+| Bronze | 7+ days |
+| Silver | 21+ days |
+| Gold | 45+ days |
+
+## Scripts
+
+```bash
+npm run dev      # development
+npm run build    # production build
+npm run start    # serve production build
+npm run lint     # eslint
+```
+
+## License
+
+[MIT](./LICENSE)
+
+---
+
+Built for the Nimiq Pay Mini Apps Framework.  
+Deeplink: `nimiqpay://miniapp?url=your-deployment.vercel.app`
