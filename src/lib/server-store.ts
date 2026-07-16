@@ -130,6 +130,19 @@ export async function listLeaderboard(): Promise<LeaderboardEntry[]> {
   }));
 }
 
+export async function removeLeaderboardEntry(
+  walletAddress: string
+): Promise<void> {
+  if (!hasDatabaseUrl()) {
+    const db = getMemoryDb();
+    delete db.leaderboard[walletAddress];
+    return;
+  }
+  await ensureSchema();
+  const sql = getSql();
+  await sql`DELETE FROM leaderboard WHERE wallet_address = ${walletAddress}`;
+}
+
 // ——— Pools ———
 
 export async function getOrCreatePool(

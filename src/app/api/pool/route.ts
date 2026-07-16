@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { isMockWalletAddress } from "@/lib/mock-wallet";
 import {
   addForfeit,
   getOrCreatePool,
@@ -51,17 +52,28 @@ export async function POST(request: Request) {
         cycleLength,
         cycleId,
         amountLuna,
+        walletAddress,
+        demo,
       }: {
         poolId: string;
         cycleLength: CycleLength;
         cycleId: string;
         amountLuna: number;
+        walletAddress?: string;
+        demo?: boolean;
       } = body;
       if (!poolId || !cycleId || !amountLuna) {
         return NextResponse.json(
           { error: "poolId, cycleId, amountLuna required" },
           { status: 400 }
         );
+      }
+      if (demo === true || isMockWalletAddress(walletAddress)) {
+        return NextResponse.json({
+          ok: true,
+          skipped: true,
+          reason: "demo_wallet",
+        });
       }
       const pool = await addForfeit(
         poolId,
@@ -80,6 +92,7 @@ export async function POST(request: Request) {
         length,
         stakeLuna,
         streakDays,
+        demo,
       } = body as {
         cycleId: string;
         poolId: string;
@@ -87,12 +100,20 @@ export async function POST(request: Request) {
         length: CycleLength;
         stakeLuna: number;
         streakDays: number;
+        demo?: boolean;
       };
       if (!cycleId || !poolId || !walletAddress) {
         return NextResponse.json(
           { error: "cycleId, poolId, walletAddress required" },
           { status: 400 }
         );
+      }
+      if (demo === true || isMockWalletAddress(walletAddress)) {
+        return NextResponse.json({
+          ok: true,
+          skipped: true,
+          reason: "demo_wallet",
+        });
       }
       await registerSurvivor({
         cycleId,

@@ -1,6 +1,9 @@
 "use client";
 
 import { ESCROW_ADDRESS, MOCK_MODE_KEY } from "./constants";
+import { MOCK_ADDRESS_MARKERS } from "./mock-wallet";
+
+export { isMockWalletAddress } from "./mock-wallet";
 
 export type NimiqClient = {
   listAccounts: () => Promise<string[]>;
@@ -74,10 +77,12 @@ function randomTxHash(): string {
 }
 
 function mockAddressFromSeed(seed: string): string {
-  // Deterministic fake Nimiq-style address for demo
+  // Deterministic fake Nimiq-style address for demo (includes DEADBEEFCAFEDEMO marker)
   let h = 0;
   for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
-  const hex = h.toString(16).padEnd(32, "0").slice(0, 32);
+  const hex = (h.toString(16).padStart(8, "0") + MOCK_ADDRESS_MARKERS[0])
+    .padEnd(32, "0")
+    .slice(0, 32);
   const groups = hex.match(/.{1,4}/g)!;
   return `NQ${String((h % 90) + 10)} ${groups.join(" ").toUpperCase()}`;
 }

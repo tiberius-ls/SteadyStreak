@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { upsertLeaderboard } from "@/lib/server-store";
+import { isMockWalletAddress } from "@/lib/mock-wallet";
+import {
+  removeLeaderboardEntry,
+  upsertLeaderboard,
+} from "@/lib/server-store";
 import { tierForStreak } from "@/lib/streak";
 import type { CycleLength, CycleStatus } from "@/lib/types";
 
@@ -8,6 +12,7 @@ export const dynamic = "force-dynamic";
 /**
  * Records a confirmed check-in on the public leaderboard (streak only).
  * Savings amounts are never accepted or stored here.
+ * Demo / mock wallets are rejected so they never pollute the public board.
  */
 export async function POST(request: Request) {
   try {
@@ -18,12 +23,14 @@ export async function POST(request: Request) {
       streak,
       cycleLength,
       status,
+      demo,
     }: {
       walletAddress: string;
       habit: string;
       streak: number;
       cycleLength: CycleLength;
       status: CycleStatus;
+      demo?: boolean;
     } = body;
 
     if (!walletAddress || typeof streak !== "number") {
@@ -31,6 +38,16 @@ export async function POST(request: Request) {
         { error: "walletAddress and streak required" },
         { status: 400 }
       );
+    }
+
+    if (demo === true || isMockWalletAddress(walletAddress)) {
+      // Drop any prior pollution for this address
+      await removeLeaderboardEntry(walletAddress).catch(() => {});
+      return NextResponse.json({
+        ok: true,
+        skipped: true,
+        reason: "demo_wallet",
+      });
     }
 
     const entry = await upsertLeaderboard({

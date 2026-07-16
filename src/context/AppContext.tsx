@@ -11,6 +11,7 @@ import {
 } from "react";
 import {
   connectWallet,
+  isMockWalletAddress,
   shortAddress,
   type NimiqClient,
 } from "@/lib/nimiq";
@@ -163,6 +164,17 @@ export function AppProvider({ children }: { children: ReactNode }) {
     saveState(state);
   }, [state, ready]);
 
+  const isDemoSession = useCallback(
+    (walletAddress?: string | null) => {
+      if (client?.isMock) return true;
+      if (isMockWalletAddress(walletAddress ?? state.user?.walletAddress)) {
+        return true;
+      }
+      return false;
+    },
+    [client, state.user?.walletAddress]
+  );
+
   // Re-evaluate streak breakage when cycle is active
   useEffect(() => {
     if (!ready) return;
@@ -171,36 +183,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
     const ch = checkinsForCycle(state, cycle.id);
     const info = evaluateStreak(cycle, ch);
+    const demo = isMockWalletAddress(cycle.walletAddress) || client?.isMock;
     if (info.status === "broken" && cycle.status === "active") {
       setState((prev) => {
-        let next = updateCycle(prev, cycle.id, {
+        const next = updateCycle(prev, cycle.id, {
           status: "broken",
           brokenAtDay: info.brokenAtDay,
         });
-        // Forfeit stakes to shared pool
-        const stake = forfeitedStakeLuna(ch);
-        void fetch("/api/pool", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            action: "forfeit",
-            poolId: cycle.poolId,
-            cycleLength: cycle.length,
-            cycleId: cycle.id,
-            amountLuna: stake,
-          }),
-        }).catch(() => {});
-        void fetch("/api/checkin", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            walletAddress: cycle.walletAddress,
-            habit: cycle.habit,
-            streak: 0,
-            cycleLength: cycle.length,
-            status: "broken",
-          }),
-        }).catch(() => {});
+        // Forfeit stakes to shared pool — never publish demo wallets
+        if (!demo) {
+          const stake = forfeitedStakeLuna(ch);
+          void fetch("/api/pool", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "forfeit",
+              poolId: cycle.poolId,
+              cycleLength: cycle.length,
+              cycleId: cycle.id,
+              amountLuna: stake,
+            }),
+          }).catch(() => {});
+          void fetch("/api/checkin", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              walletAddress: cycle.walletAddress,
+              habit: cycle.habit,
+              streak: 0,
+              cycleLength: cycle.length,
+              status: "broken",
+            }),
+          }).catch(() => {});
+        }
         return next;
       });
       setScreen("payout");
@@ -208,22 +223,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setState((prev) =>
         updateCycle(prev, cycle.id, { status: "completed" })
       );
-      const stake = ch.reduce((s, c) => s + c.stakeLuna, 0);
-      void fetch("/api/pool", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "survivor",
-          cycleId: cycle.id,
-          poolId: cycle.poolId,
-          walletAddress: cycle.walletAddress,
-          length: cycle.length,
-          stakeLuna: stake,
-          streakDays: ch.length,
-        }),
-      }).catch(() => {});
+      if (!demo) {
+        const stake = ch.reduce((s, c) => s + c.stakeLuna, 0);
+        void fetch("/api/pool", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "survivor",
+            cycleId: cycle.id,
+            poolId: cycle.poolId,
+            walletAddress: cycle.walletAddress,
+            length: cycle.length,
+            stakeLuna: stake,
+            streakDays: ch.length,
+          }),
+        }).catch(() => {});
+      }
     }
-  }, [ready, state]);
+  }, [ready, state, client?.isMock]);
 
   const activeCycle = useMemo(() => getActiveCycle(state), [state]);
   const latestCycle = useMemo(() => getLatestCycle(state), [state]);
@@ -438,17 +455,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
       };
       setState((prev) => addCycle(prev, cycle));
 
-      await fetch("/api/checkin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          walletAddress: cycle.walletAddress,
-          habit: cycle.habit,
-          streak: 0,
-          cycleLength: cycle.length,
-          status: "active",
-        }),
-      }).catch(() => {});
+      // Demo wallets stay local only — never pollute the public leaderboard
+      if (!isDemoSession(cycle.walletAddress)) {
+        await fetch("/api/checkin", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            walletAddress: cycle.walletAddress,
+            habit: cycle.habit,
+            streak: 0,
+            cycleLength: cycle.length,
+            status: "active",
+          }),
+        }).catch(() => {});
+      }
 
       setScreen("home");
     } catch (e) {
@@ -463,6 +483,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     draftHabit,
     customHabit,
     draftLength,
+    isDemoSession,
   ]);
 
   const markDone = useCallback(async () => {
@@ -537,44 +558,50 @@ export function AppProvider({ children }: { children: ReactNode }) {
       });
 
       const newStreak = day;
-      await fetch("/api/checkin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          walletAddress: focusCycle.walletAddress,
-          habit: focusCycle.habit,
-          streak: newStreak,
-          cycleLength: focusCycle.length,
-          status: day === focusCycle.length ? "completed" : "active",
-        }),
-      }).catch(() => {});
+      const demo = wallet.isMock || isDemoSession(focusCycle.walletAddress);
 
-      if (day === focusCycle.length) {
-        const stake =
-          (checkins.length + 1) * focusCycle.dailyStakeLuna;
-        await fetch("/api/pool", {
+      if (!demo) {
+        await fetch("/api/checkin", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            action: "survivor",
-            cycleId: focusCycle.id,
-            poolId: focusCycle.poolId,
             walletAddress: focusCycle.walletAddress,
-            length: focusCycle.length,
-            stakeLuna: stake,
-            streakDays: day,
+            habit: focusCycle.habit,
+            streak: newStreak,
+            cycleLength: focusCycle.length,
+            status: day === focusCycle.length ? "completed" : "active",
           }),
         }).catch(() => {});
+      }
+
+      if (day === focusCycle.length) {
+        if (!demo) {
+          const stake =
+            (checkins.length + 1) * focusCycle.dailyStakeLuna;
+          await fetch("/api/pool", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "survivor",
+              cycleId: focusCycle.id,
+              poolId: focusCycle.poolId,
+              walletAddress: focusCycle.walletAddress,
+              length: focusCycle.length,
+              stakeLuna: stake,
+              streakDays: day,
+            }),
+          }).catch(() => {});
+        }
         setScreen("payout");
       }
 
-      await refreshLeaderboard();
+      if (!demo) await refreshLeaderboard();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Check-in transaction failed");
     } finally {
       setBusy(false);
     }
-  }, [focusCycle, client, checkins, refreshLeaderboard]);
+  }, [focusCycle, client, checkins, refreshLeaderboard, isDemoSession]);
 
   const claimPayout = useCallback(async () => {
     if (!focusCycle || !payoutBreakdown) return;
