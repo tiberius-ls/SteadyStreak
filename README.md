@@ -11,6 +11,17 @@ Every day you complete your habit, you send **one combined NIM transaction**:
 
 Survivors who finish the full cycle split the forfeited stake pool with a streak multiplier.
 
+## Live demo
+
+| | |
+|---|---|
+| **App** | [https://steadystreak.vercel.app](https://steadystreak.vercel.app) |
+| **Nimiq Pay deeplink** | `nimiqpay://miniapp?url=https://steadystreak.vercel.app` |
+| **Source** | [github.com/tiberius-ls/SteadyStreak](https://github.com/tiberius-ls/SteadyStreak) |
+
+In a normal browser, open the app and use **Continue with demo wallet**.  
+On a device with Nimiq Pay installed, use the deeplink to connect a real wallet.
+
 ## Why it fits Nimiq Pay
 
 - Wallet connect via `@nimiq/mini-app-sdk` (`init()` + `listAccounts`)
@@ -66,9 +77,9 @@ Check-ins simulate NIM transactions so you can exercise the full product flow.
 
 ### Inside Nimiq Pay
 
-1. Deploy or tunnel the app (HTTPS)
-2. Open: `nimiqpay://miniapp?url=YOUR_HOST`
-3. Connect → set habit & amounts → **Mark done** each day
+1. Open the live deeplink: `nimiqpay://miniapp?url=https://steadystreak.vercel.app`  
+   (or point at your own HTTPS host / tunnel)
+2. Connect wallet → set habit & amounts → **Mark done** each day
 
 ## Environment
 
@@ -112,4 +123,4 @@ npm run lint     # eslint
 ---
 
 Built for the Nimiq Pay Mini Apps Framework.  
-Deeplink: `nimiqpay://miniapp?url=your-deployment.vercel.app`
+Live: [steadystreak.vercel.app](https://steadystreak.vercel.app) · Deeplink: `nimiqpay://miniapp?url=https://steadystreak.vercel.app`
