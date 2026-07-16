@@ -33,7 +33,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const entry = upsertLeaderboard({
+    const entry = await upsertLeaderboard({
       walletAddress,
       habit: habit ?? "Habit",
       streak: Math.max(0, Math.floor(streak)),
@@ -44,7 +44,11 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json({ ok: true, entry });
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  } catch (err) {
+    console.error("[api/checkin]", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Server error" },
+      { status: 500 }
+    );
   }
 }

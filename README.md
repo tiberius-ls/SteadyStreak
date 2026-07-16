@@ -58,13 +58,14 @@ Broken users receive **savings principal only**.
 - `@nimiq/mini-app-sdk` for Nimiq Pay wallet integration
 - Client `localStorage` for personal cycles / check-ins / payouts
 - API routes for public leaderboard + shared stake pools
+- Optional **Postgres** (`DATABASE_URL`) for durable leaderboard / pools (Neon-compatible)
 - Deployable on Vercel
 
 ## Quick start
 
 ```bash
 npm install
-cp .env.example .env.local   # optional: set NEXT_PUBLIC_ESCROW_ADDRESS
+cp .env.example .env.local   # optional: escrow + DATABASE_URL
 npm run dev
 ```
 
@@ -86,6 +87,14 @@ Check-ins simulate NIM transactions so you can exercise the full product flow.
 | Variable | Description |
 |----------|-------------|
 | `NEXT_PUBLIC_ESCROW_ADDRESS` | Nimiq address receiving daily save+stake txs |
+| `DATABASE_URL` | Optional Postgres URL. When set, leaderboard + pools persist. When unset, in-memory (resets on cold start). |
+
+### Durable store (recommended for production)
+
+1. Create a free Postgres DB (e.g. [Neon](https://neon.tech) or Vercel Storage → Postgres).
+2. Copy the connection string into `DATABASE_URL` (local `.env.local` and Vercel → Project → Settings → Environment Variables).
+3. Redeploy. Schema tables are created automatically on first API request.
+4. Confirm: `GET /api/leaderboard` returns `"store": "postgres"` (instead of `"memory"`).
 
 Payout **claims** are recorded in-app with a full breakdown. Production escrow **releases** should be operated by a pool operator wallet that matches the escrow address (not shipped with private keys in this repo).
 
@@ -97,7 +106,7 @@ Payout **claims** are recorded in-app with a full breakdown. Production escrow *
 - `stakes_pool` — poolId, total_forfeited  
 - `payouts` — amount breakdown + claim reference  
 
-Personal data lives on-device; leaderboard / pool state use server API routes (in-memory process store — swap for Redis/Postgres for multi-region production).
+Personal data lives on-device. Leaderboard / pool / forfeit / survivor rows live in the server store (Postgres when `DATABASE_URL` is set, otherwise process memory).
 
 ## Tier badges
 

@@ -1,23 +1,34 @@
 import { NextResponse } from "next/server";
-import { listLeaderboard, upsertLeaderboard } from "@/lib/server-store";
+import { listLeaderboard, storeBackend, upsertLeaderboard } from "@/lib/server-store";
 import type { CycleLength, CycleStatus, LeaderboardEntry } from "@/lib/types";
 import { tierForStreak } from "@/lib/streak";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const entries = listLeaderboard();
-  // Never expose savings — leaderboard only ranks by streak
-  const safe = entries.map((e) => ({
-    walletAddress: e.walletAddress,
-    habit: e.habit,
-    streak: e.streak,
-    cycleLength: e.cycleLength,
-    tier: e.tier,
-    status: e.status,
-    updatedAt: e.updatedAt,
-  }));
-  return NextResponse.json({ leaderboard: safe });
+  try {
+    const entries = await listLeaderboard();
+    // Never expose savings — leaderboard only ranks by streak
+    const safe = entries.map((e) => ({
+      walletAddress: e.walletAddress,
+      habit: e.habit,
+      streak: e.streak,
+      cycleLength: e.cycleLength,
+      tier: e.tier,
+      status: e.status,
+      updatedAt: e.updatedAt,
+    }));
+    return NextResponse.json({
+      leaderboard: safe,
+      store: storeBackend(),
+    });
+  } catch (err) {
+    console.error("[api/leaderboard GET]", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Server error" },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request: Request) {
@@ -40,9 +51,13 @@ export async function POST(request: Request) {
       updatedAt: new Date().toISOString(),
     };
 
-    upsertLeaderboard(entry);
-    return NextResponse.json({ ok: true, entry });
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    await upsertLeaderboard(entry);
+    return NextResponse.json({ ok: true, entry, store: storeBackend() });
+  } catch (err) {
+    console.error("[api/leaderboard POST]", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Server error" },
+      { status: 500 }
+    );
   }
 }

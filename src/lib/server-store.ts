@@ -1,35 +1,34 @@
 /**
  * Shared server-side store for leaderboard + stake pools.
- * Uses globalThis so state survives hot reloads in dev and is shared
- * across concurrent requests within the same serverless instance.
  *
- * For production multi-region durability, swap to Redis / Postgres.
+ * - With DATABASE_URL: durable Postgres (Neon / Vercel Postgres / etc.)
+ * - Without: in-memory via globalThis (survives hot reload in one process only)
  */
 
+import { ensureSchema, getSql, hasDatabaseUrl } from "./db";
 import type {
   CycleLength,
+  CycleStatus,
   LeaderboardEntry,
   StakePool,
+  Tier,
 } from "./types";
+
+export type SurvivorRecord = {
+  cycleId: string;
+  poolId: string;
+  walletAddress: string;
+  length: CycleLength;
+  stakeLuna: number;
+  streakDays: number;
+  completed: boolean;
+};
 
 export interface ServerDb {
   leaderboard: Record<string, LeaderboardEntry>;
   pools: Record<string, StakePool>;
-  /** cycleId -> forfeited amount already counted */
   forfeits: Record<string, number>;
-  /** cycleId -> survivor payload for payout math */
-  survivors: Record<
-    string,
-    {
-      cycleId: string;
-      poolId: string;
-      walletAddress: string;
-      length: CycleLength;
-      stakeLuna: number;
-      streakDays: number;
-      completed: boolean;
-    }
-  >;
+  survivors: Record<string, SurvivorRecord>;
 }
 
 const GLOBAL_KEY = "__steadystreak_db__";
@@ -43,7 +42,7 @@ function emptyDb(): ServerDb {
   };
 }
 
-export function getDb(): ServerDb {
+function getMemoryDb(): ServerDb {
   const g = globalThis as typeof globalThis & {
     [GLOBAL_KEY]?: ServerDb;
   };
@@ -53,74 +52,264 @@ export function getDb(): ServerDb {
   return g[GLOBAL_KEY]!;
 }
 
-export function upsertLeaderboard(entry: LeaderboardEntry): LeaderboardEntry {
-  const db = getDb();
-  db.leaderboard[entry.walletAddress] = entry;
+export function storeBackend(): "postgres" | "memory" {
+  return hasDatabaseUrl() ? "postgres" : "memory";
+}
+
+// ——— Leaderboard ———
+
+export async function upsertLeaderboard(
+  entry: LeaderboardEntry
+): Promise<LeaderboardEntry> {
+  if (!hasDatabaseUrl()) {
+    const db = getMemoryDb();
+    db.leaderboard[entry.walletAddress] = entry;
+    return entry;
+  }
+
+  await ensureSchema();
+  const sql = getSql();
+  await sql`
+    INSERT INTO leaderboard (
+      wallet_address, habit, streak, cycle_length, tier, status, updated_at
+    ) VALUES (
+      ${entry.walletAddress},
+      ${entry.habit},
+      ${entry.streak},
+      ${entry.cycleLength},
+      ${entry.tier},
+      ${entry.status},
+      ${entry.updatedAt}
+    )
+    ON CONFLICT (wallet_address) DO UPDATE SET
+      habit = EXCLUDED.habit,
+      streak = EXCLUDED.streak,
+      cycle_length = EXCLUDED.cycle_length,
+      tier = EXCLUDED.tier,
+      status = EXCLUDED.status,
+      updated_at = EXCLUDED.updated_at
+  `;
   return entry;
 }
 
-export function listLeaderboard(): LeaderboardEntry[] {
-  const db = getDb();
-  return Object.values(db.leaderboard).sort((a, b) => {
-    if (b.streak !== a.streak) return b.streak - a.streak;
-    return a.walletAddress.localeCompare(b.walletAddress);
-  });
+export async function listLeaderboard(): Promise<LeaderboardEntry[]> {
+  if (!hasDatabaseUrl()) {
+    const db = getMemoryDb();
+    return Object.values(db.leaderboard).sort((a, b) => {
+      if (b.streak !== a.streak) return b.streak - a.streak;
+      return a.walletAddress.localeCompare(b.walletAddress);
+    });
+  }
+
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT
+      wallet_address AS "walletAddress",
+      habit,
+      streak,
+      cycle_length AS "cycleLength",
+      tier,
+      status,
+      updated_at AS "updatedAt"
+    FROM leaderboard
+    ORDER BY streak DESC, wallet_address ASC
+  `;
+
+  return rows.map((row) => ({
+    walletAddress: String(row.walletAddress),
+    habit: String(row.habit),
+    streak: Number(row.streak),
+    cycleLength: Number(row.cycleLength) as CycleLength,
+    tier: row.tier as Tier,
+    status: row.status as CycleStatus,
+    updatedAt:
+      row.updatedAt instanceof Date
+        ? row.updatedAt.toISOString()
+        : String(row.updatedAt),
+  }));
 }
 
-export function getOrCreatePool(
+// ——— Pools ———
+
+export async function getOrCreatePool(
   poolId: string,
   cycleLength: CycleLength
-): StakePool {
-  const db = getDb();
-  if (!db.pools[poolId]) {
-    db.pools[poolId] = {
+): Promise<StakePool> {
+  if (!hasDatabaseUrl()) {
+    const db = getMemoryDb();
+    if (!db.pools[poolId]) {
+      db.pools[poolId] = {
+        poolId,
+        cycleLength,
+        totalForfeitedLuna: 0,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+    return db.pools[poolId];
+  }
+
+  await ensureSchema();
+  const sql = getSql();
+  const updatedAt = new Date().toISOString();
+  await sql`
+    INSERT INTO pools (pool_id, cycle_length, total_forfeited_luna, updated_at)
+    VALUES (${poolId}, ${cycleLength}, 0, ${updatedAt})
+    ON CONFLICT (pool_id) DO NOTHING
+  `;
+  const pool = await getPool(poolId);
+  if (!pool) {
+    // Should not happen after insert; return a safe default
+    return {
       poolId,
       cycleLength,
       totalForfeitedLuna: 0,
-      updatedAt: new Date().toISOString(),
+      updatedAt,
     };
   }
-  return db.pools[poolId];
+  return pool;
 }
 
-export function addForfeit(
+export async function getPool(poolId: string): Promise<StakePool | null> {
+  if (!hasDatabaseUrl()) {
+    return getMemoryDb().pools[poolId] ?? null;
+  }
+
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT
+      pool_id AS "poolId",
+      cycle_length AS "cycleLength",
+      total_forfeited_luna AS "totalForfeitedLuna",
+      updated_at AS "updatedAt"
+    FROM pools
+    WHERE pool_id = ${poolId}
+    LIMIT 1
+  `;
+  if (!rows.length) return null;
+  const row = rows[0];
+  return {
+    poolId: String(row.poolId),
+    cycleLength: Number(row.cycleLength) as CycleLength,
+    totalForfeitedLuna: Number(row.totalForfeitedLuna),
+    updatedAt:
+      row.updatedAt instanceof Date
+        ? row.updatedAt.toISOString()
+        : String(row.updatedAt),
+  };
+}
+
+export async function addForfeit(
   poolId: string,
   cycleLength: CycleLength,
   cycleId: string,
   amountLuna: number
-): StakePool {
-  const db = getDb();
-  if (db.forfeits[cycleId]) {
-    return getOrCreatePool(poolId, cycleLength);
+): Promise<StakePool> {
+  if (!hasDatabaseUrl()) {
+    const db = getMemoryDb();
+    if (db.forfeits[cycleId]) {
+      return getOrCreatePool(poolId, cycleLength);
+    }
+    const pool = await getOrCreatePool(poolId, cycleLength);
+    pool.totalForfeitedLuna += amountLuna;
+    pool.updatedAt = new Date().toISOString();
+    db.forfeits[cycleId] = amountLuna;
+    return pool;
   }
-  const pool = getOrCreatePool(poolId, cycleLength);
-  pool.totalForfeitedLuna += amountLuna;
-  pool.updatedAt = new Date().toISOString();
-  db.forfeits[cycleId] = amountLuna;
-  return pool;
+
+  await ensureSchema();
+  const sql = getSql();
+  await getOrCreatePool(poolId, cycleLength);
+
+  // Idempotent: only first forfeit for a cycleId counts
+  const inserted = await sql`
+    INSERT INTO forfeits (cycle_id, pool_id, amount_luna)
+    VALUES (${cycleId}, ${poolId}, ${amountLuna})
+    ON CONFLICT (cycle_id) DO NOTHING
+    RETURNING cycle_id
+  `;
+
+  if (inserted.length > 0) {
+    const updatedAt = new Date().toISOString();
+    await sql`
+      UPDATE pools
+      SET
+        total_forfeited_luna = total_forfeited_luna + ${amountLuna},
+        updated_at = ${updatedAt}
+      WHERE pool_id = ${poolId}
+    `;
+  }
+
+  return (await getPool(poolId)) ?? (await getOrCreatePool(poolId, cycleLength));
 }
 
-export function registerSurvivor(payload: {
-  cycleId: string;
-  poolId: string;
-  walletAddress: string;
-  length: CycleLength;
-  stakeLuna: number;
-  streakDays: number;
-  completed: boolean;
-}) {
-  const db = getDb();
-  db.survivors[payload.cycleId] = payload;
-  getOrCreatePool(payload.poolId, payload.length);
+export async function registerSurvivor(payload: SurvivorRecord): Promise<void> {
+  if (!hasDatabaseUrl()) {
+    const db = getMemoryDb();
+    db.survivors[payload.cycleId] = payload;
+    await getOrCreatePool(payload.poolId, payload.length);
+    return;
+  }
+
+  await ensureSchema();
+  const sql = getSql();
+  await getOrCreatePool(payload.poolId, payload.length);
+  await sql`
+    INSERT INTO survivors (
+      cycle_id, pool_id, wallet_address, length,
+      stake_luna, streak_days, completed
+    ) VALUES (
+      ${payload.cycleId},
+      ${payload.poolId},
+      ${payload.walletAddress},
+      ${payload.length},
+      ${payload.stakeLuna},
+      ${payload.streakDays},
+      ${payload.completed}
+    )
+    ON CONFLICT (cycle_id) DO UPDATE SET
+      pool_id = EXCLUDED.pool_id,
+      wallet_address = EXCLUDED.wallet_address,
+      length = EXCLUDED.length,
+      stake_luna = EXCLUDED.stake_luna,
+      streak_days = EXCLUDED.streak_days,
+      completed = EXCLUDED.completed
+  `;
 }
 
-export function getPool(poolId: string): StakePool | null {
-  return getDb().pools[poolId] ?? null;
-}
+export async function getSurvivorsForPool(
+  poolId: string
+): Promise<SurvivorRecord[]> {
+  if (!hasDatabaseUrl()) {
+    const db = getMemoryDb();
+    return Object.values(db.survivors).filter(
+      (s) => s.poolId === poolId && s.completed
+    );
+  }
 
-export function getSurvivorsForPool(poolId: string) {
-  const db = getDb();
-  return Object.values(db.survivors).filter(
-    (s) => s.poolId === poolId && s.completed
-  );
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT
+      cycle_id AS "cycleId",
+      pool_id AS "poolId",
+      wallet_address AS "walletAddress",
+      length,
+      stake_luna AS "stakeLuna",
+      streak_days AS "streakDays",
+      completed
+    FROM survivors
+    WHERE pool_id = ${poolId} AND completed = true
+  `;
+
+  return rows.map((row) => ({
+    cycleId: String(row.cycleId),
+    poolId: String(row.poolId),
+    walletAddress: String(row.walletAddress),
+    length: Number(row.length) as CycleLength,
+    stakeLuna: Number(row.stakeLuna),
+    streakDays: Number(row.streakDays),
+    completed: Boolean(row.completed),
+  }));
 }
