@@ -22,6 +22,8 @@ export function Home() {
     streakInfo,
     privateSavingsLuna,
     privateStakeLuna,
+    poolForfeitLuna,
+    poolSurvivorCount,
     rank,
     markDone,
     busy,
@@ -137,6 +139,19 @@ export function Home() {
         </Card>
         <Card>
           <Stat
+            label="Pool pot"
+            value={`${formatNim(poolForfeitLuna)} NIM`}
+            hint={
+              poolForfeitLuna > 0
+                ? `Forfeits from broken streaks · ${poolSurvivorCount} survivor${
+                    poolSurvivorCount === 1 ? "" : "s"
+                  }`
+                : "Grows when others break · survivors split it"
+            }
+          />
+        </Card>
+        <Card>
+          <Stat
             label="Pool rank"
             value={rank ? `#${rank}` : "—"}
             hint="By streak only"
@@ -150,6 +165,17 @@ export function Home() {
           />
         </Card>
       </div>
+
+      <Card className="compact">
+        <h2 className="card-title">Your pool cohort</h2>
+        <p className="muted small">
+          Shared stake pot for{" "}
+          <strong>{cycle.length}-day</strong> cycles that started{" "}
+          <strong>{cycle.startDate}</strong>. Broken stakes feed the pot;
+          survivors split it at cycle end (see Payout).
+        </p>
+        <p className="muted tiny mono">pool · {cycle.poolId}</p>
+      </Card>
 
       {checkins.length > 0 ? (
         <Card>

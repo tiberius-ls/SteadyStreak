@@ -90,6 +90,10 @@ interface AppContextValue {
   streakInfo: ReturnType<typeof evaluateStreak> | null;
   privateSavingsLuna: number;
   privateStakeLuna: number;
+  /** Shared forfeited stake pot for this cycle's pool cohort (luna) */
+  poolForfeitLuna: number;
+  /** Survivors registered in this pool cohort */
+  poolSurvivorCount: number;
   rank: number | null;
 
   // Actions
@@ -698,6 +702,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     streakInfo,
     privateSavingsLuna,
     privateStakeLuna,
+    poolForfeitLuna: poolForfeit,
+    poolSurvivorCount: poolSurvivors.length,
     rank,
     markDone,
     refreshLeaderboard,
