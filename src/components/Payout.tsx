@@ -105,6 +105,34 @@ export function Payout() {
               never to savings.
             </p>
           </Card>
+
+          <Card className="compact">
+            <h2 className="card-title">How payouts work</h2>
+            <p className="muted small">
+              Daily check-ins send NIM to the <strong>escrow</strong> wallet.
+              This screen calculates what you&apos;re owed.{" "}
+              <strong>Claim</strong> records that amount in the app — it does
+              not move coins by itself.
+            </p>
+            <p className="muted small">
+              The <strong>pool operator</strong> (escrow owner) then sends the
+              total from escrow to your Nimiq Pay wallet:
+            </p>
+            <ul className="muted small payout-rules">
+              <li>
+                <strong>Broken streak</strong> — savings principal only; stake
+                stays in the shared pool
+              </li>
+              <li>
+                <strong>Completed cycle</strong> — savings + your stake + pool
+                bonus share
+              </li>
+            </ul>
+            <p className="muted tiny">
+              Escrow private keys never live in this mini app. Releases are
+              manual on purpose.
+            </p>
+          </Card>
         </>
       ) : (
         <Card>
@@ -120,9 +148,12 @@ export function Payout() {
             Claim recorded · <span className="mono">{payout.txHash}</span>
           </p>
           <p className="muted tiny">
-            Escrow operators release{" "}
-            {formatNim(payout.totalLuna)} NIM to your Nimiq wallet. Demo mode
-            records the claim on-device.
+            Operator should release{" "}
+            <strong>{formatNim(payout.totalLuna)} NIM</strong> from escrow to{" "}
+            <span className="mono">
+              {cycle.walletAddress}
+            </span>
+            . Demo mode only stores the claim on-device.
           </p>
         </Card>
       ) : null}
@@ -131,8 +162,8 @@ export function Payout() {
         {!paid && payoutBreakdown ? (
           <Button className="full" onClick={() => claimPayout()} disabled={busy}>
             {busy
-              ? "Recording…"
-              : `Claim ${formatNim(payoutBreakdown.totalLuna)} NIM payout`}
+              ? "Recording claim…"
+              : `Record claim · ${formatNim(payoutBreakdown.totalLuna)} NIM`}
           </Button>
         ) : null}
         <Button

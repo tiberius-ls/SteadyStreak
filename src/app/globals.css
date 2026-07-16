@@ -483,6 +483,15 @@ input {
   border-bottom: none;
 }
 
+.payout-rules {
+  margin: 8px 0 0;
+  padding-left: 1.15rem;
+}
+
+.payout-rules li {
+  margin-bottom: 6px;
+}
+
 .rank-list {
   display: flex;
   flex-direction: column;

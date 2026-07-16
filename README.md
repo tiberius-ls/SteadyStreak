@@ -96,7 +96,40 @@ Check-ins simulate NIM transactions so you can exercise the full product flow.
 3. Redeploy. Schema tables are created automatically on first API request.
 4. Confirm: `GET /api/leaderboard` returns `"store": "postgres"` (instead of `"memory"`).
 
-Payout **claims** are recorded in-app with a full breakdown. Production escrow **releases** should be operated by a pool operator wallet that matches the escrow address (not shipped with private keys in this repo).
+## How payouts work (operator)
+
+SteadyStreak splits **accounting** (in the app) from **money movement** (your escrow wallet).
+
+| Step | Who | What happens |
+|------|-----|----------------|
+| Daily check-in | User | One NIM tx (save + stake) → **escrow** address |
+| Cycle ends or breaks | App | Shows breakdown: savings, stake, pool bonus, total |
+| Claim | User | Records the claim **in-app** (does not send NIM) |
+| Release | **Operator** | Sends the total from **escrow** → user wallet in Nimiq Pay / Wallet |
+
+### Who gets what
+
+| Outcome | User receives from escrow |
+|---------|---------------------------|
+| **Broken streak** | Savings principal only (stake stays in the shared pool) |
+| **Completed cycle** | Savings + own stake + share of forfeited pool (streak multiplier) |
+
+Pool cohorts are `cycleLength + startDate` (e.g. all 30-day cycles that started the same local day). Survivors split forfeited stakes with:
+
+```text
+multiplier = min(3, streak_days / cycle_length * 3)
+weight     = own_stake * multiplier
+bonus      = total_forfeited * weight / sum(weights)
+```
+
+### Operator checklist
+
+1. Hold the private keys for `NEXT_PUBLIC_ESCROW_ADDRESS` (never put them in this repo or the mini app).
+2. After a user claims, confirm their Payout total and wallet address.
+3. Send that NIM amount from the escrow wallet to the user.
+4. Optionally keep a simple sheet of claim id / amount / release tx hash.
+
+Escrow **releases are manual by design** in v1 so the website never holds pool keys. A future version could automate via a secured operator service or on-chain rules.
 
 ## Data model
 
