@@ -1,7 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Mini apps run inside Nimiq Pay WebView; avoid X-Frame-Options blocking.
+  // Mini apps run inside Nimiq Pay WebView; do not set X-Frame-Options DENY.
   async headers() {
     return [
       {
@@ -11,6 +11,14 @@ const nextConfig: NextConfig = {
           {
             key: "Referrer-Policy",
             value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
+          },
+          {
+            key: "X-DNS-Prefetch-Control",
+            value: "on",
           },
         ],
       },

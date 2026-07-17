@@ -617,8 +617,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setBusy(true);
     setError(null);
     try {
-      // Payout is recorded locally. Real escrow release is operated by the
-      // pool operator; we tag a claim reference for transparency.
+      // Local record + server pending claim for the escrow operator queue.
       const claimRef = `claim-${focusCycle.id.slice(0, 8)}-${Date.now().toString(36)}`;
       const payout: Payout = {
         id: newId(),
@@ -633,6 +632,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
         txHash: claimRef,
         claimedAt: new Date().toISOString(),
       };
+
+      if (!isDemoSession(focusCycle.walletAddress)) {
+        const res = await fetch("/api/claims", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "claim",
+            cycleId: focusCycle.id,
+            poolId: focusCycle.poolId,
+            walletAddress: focusCycle.walletAddress,
+            savingsPrincipalLuna: payoutBreakdown.savingsPrincipalLuna,
+            stakeReturnedLuna: payoutBreakdown.ownStakeLuna,
+            bonusFromPoolLuna: payoutBreakdown.bonusFromPoolLuna,
+            totalLuna: payoutBreakdown.totalLuna,
+            multiplier: payoutBreakdown.multiplier,
+            claimRef,
+          }),
+        });
+        if (!res.ok) {
+          const data = (await res.json().catch(() => ({}))) as {
+            error?: string;
+          };
+          throw new Error(data.error || "Failed to register claim with server");
+        }
+      }
+
       setState((prev) => {
         let next = addPayout(prev, payout);
         next = updateCycle(next, focusCycle.id, { status: "paid_out" });
@@ -643,7 +668,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     } finally {
       setBusy(false);
     }
-  }, [focusCycle, payoutBreakdown]);
+  }, [focusCycle, payoutBreakdown, isDemoSession]);
 
   const startNewCycle = useCallback(() => {
     setDraftHabit("Exercise / workout");

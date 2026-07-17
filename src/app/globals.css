@@ -504,6 +504,12 @@ input {
   text-align: center;
 }
 
+.operator-claim {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
 .rank-list {
   display: flex;
   flex-direction: column;

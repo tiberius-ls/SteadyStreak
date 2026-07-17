@@ -17,7 +17,11 @@ Survivors who finish the full cycle split the forfeited stake pool with a streak
 |---|---|
 | **App** | [https://steadystreak.vercel.app](https://steadystreak.vercel.app) |
 | **Nimiq Pay deeplink** | `nimiqpay://miniapp?url=https://steadystreak.vercel.app` |
+| **Health** | [https://steadystreak.vercel.app/api/health](https://steadystreak.vercel.app/api/health) |
+| **Operator desk** | [https://steadystreak.vercel.app/operator](https://steadystreak.vercel.app/operator) |
 | **Source** | [github.com/tiberius-ls/SteadyStreak](https://github.com/tiberius-ls/SteadyStreak) |
+
+Production checklist and operator workflow: **[PRODUCTION.md](./PRODUCTION.md)**.
 
 In a normal browser, open the app and use **Continue with demo wallet**.  
 On a device with Nimiq Pay installed, use the deeplink to connect a real wallet.

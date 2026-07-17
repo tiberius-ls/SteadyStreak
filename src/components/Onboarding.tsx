@@ -10,7 +10,8 @@ import {
   Shell,
 } from "@/components/ui";
 import { CYCLE_LENGTHS, PRESET_HABITS } from "@/lib/types";
-import { isNimiqPayEnvironment } from "@/lib/nimiq";
+import { allowDemoWalletClient, isNimiqPayEnvironment } from "@/lib/nimiq";
+import { DEEPLINK_BASE } from "@/lib/constants";
 import { useEffect, useState } from "react";
 
 export function Onboarding() {
@@ -32,11 +33,19 @@ export function Onboarding() {
   } = useApp();
 
   const [inPay, setInPay] = useState(false);
+  const [demoAllowed, setDemoAllowed] = useState(false);
+  const [copied, setCopied] = useState(false);
   useEffect(() => {
     setInPay(isNimiqPayEnvironment());
+    setDemoAllowed(allowDemoWalletClient());
   }, []);
 
   const connected = Boolean(state.user && (client || state.user.walletAddress));
+  const liveUrl =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://steadystreak.vercel.app";
+  const deeplink = `${DEEPLINK_BASE}${liveUrl}`;
 
   return (
     <Shell>
@@ -70,7 +79,7 @@ export function Onboarding() {
             <Button onClick={() => connect(false)} disabled={busy}>
               {busy ? "Connecting…" : "Connect with Nimiq Pay"}
             </Button>
-            {!inPay ? (
+            {!inPay && demoAllowed ? (
               <Button
                 variant="secondary"
                 onClick={() => connect(true)}
@@ -79,10 +88,28 @@ export function Onboarding() {
                 Continue with demo wallet
               </Button>
             ) : null}
+            {!inPay ? (
+              <Button
+                variant="ghost"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(deeplink);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+              >
+                {copied ? "Deeplink copied" : "Copy Nimiq Pay deeplink"}
+              </Button>
+            ) : null}
             <p className="muted tiny">
               {inPay
                 ? "Nimiq Pay detected — wallet confirmations stay native."
-                : "Not inside Nimiq Pay? Use demo mode to try the full flow with simulated txs."}
+                : demoAllowed
+                  ? "Not inside Nimiq Pay? Use demo mode locally, or open via deeplink on your phone."
+                  : "Production builds require Nimiq Pay. Copy the deeplink and open it on your device."}
             </p>
           </div>
         )}

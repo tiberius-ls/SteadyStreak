@@ -326,3 +326,244 @@ export async function getSurvivorsForPool(
     completed: Boolean(row.completed),
   }));
 }
+
+// ——— Operator claims (pending escrow releases) ———
+
+export type ClaimStatus = "pending" | "paid";
+
+export type ClaimRecord = {
+  id: string;
+  cycleId: string;
+  walletAddress: string;
+  poolId: string;
+  savingsPrincipalLuna: number;
+  stakeReturnedLuna: number;
+  bonusFromPoolLuna: number;
+  totalLuna: number;
+  multiplier: number;
+  status: ClaimStatus;
+  claimRef: string;
+  releaseTxHash?: string;
+  claimedAt: string;
+  paidAt?: string;
+};
+
+export async function upsertClaim(
+  claim: ClaimRecord
+): Promise<ClaimRecord> {
+  if (!hasDatabaseUrl()) {
+    const db = getMemoryDb() as ServerDb & {
+      claims?: Record<string, ClaimRecord>;
+    };
+    if (!db.claims) db.claims = {};
+    // Idempotent by cycleId
+    const existing = Object.values(db.claims).find(
+      (c) => c.cycleId === claim.cycleId
+    );
+    if (existing) return existing;
+    db.claims[claim.id] = claim;
+    return claim;
+  }
+
+  await ensureSchema();
+  const sql = getSql();
+  await sql`
+    INSERT INTO claims (
+      id, cycle_id, wallet_address, pool_id,
+      savings_principal_luna, stake_returned_luna, bonus_from_pool_luna,
+      total_luna, multiplier, status, claim_ref, claimed_at
+    ) VALUES (
+      ${claim.id},
+      ${claim.cycleId},
+      ${claim.walletAddress},
+      ${claim.poolId},
+      ${claim.savingsPrincipalLuna},
+      ${claim.stakeReturnedLuna},
+      ${claim.bonusFromPoolLuna},
+      ${claim.totalLuna},
+      ${claim.multiplier},
+      ${claim.status},
+      ${claim.claimRef},
+      ${claim.claimedAt}
+    )
+    ON CONFLICT (cycle_id) DO NOTHING
+  `;
+  const existing = await getClaimByCycleId(claim.cycleId);
+  return existing ?? claim;
+}
+
+export async function getClaimByCycleId(
+  cycleId: string
+): Promise<ClaimRecord | null> {
+  if (!hasDatabaseUrl()) {
+    const db = getMemoryDb() as ServerDb & {
+      claims?: Record<string, ClaimRecord>;
+    };
+    return (
+      Object.values(db.claims ?? {}).find((c) => c.cycleId === cycleId) ?? null
+    );
+  }
+  await ensureSchema();
+  const sql = getSql();
+  const rows = await sql`
+    SELECT
+      id,
+      cycle_id AS "cycleId",
+      wallet_address AS "walletAddress",
+      pool_id AS "poolId",
+      savings_principal_luna AS "savingsPrincipalLuna",
+      stake_returned_luna AS "stakeReturnedLuna",
+      bonus_from_pool_luna AS "bonusFromPoolLuna",
+      total_luna AS "totalLuna",
+      multiplier,
+      status,
+      claim_ref AS "claimRef",
+      release_tx_hash AS "releaseTxHash",
+      claimed_at AS "claimedAt",
+      paid_at AS "paidAt"
+    FROM claims
+    WHERE cycle_id = ${cycleId}
+    LIMIT 1
+  `;
+  if (!rows.length) return null;
+  return mapClaimRow(rows[0]);
+}
+
+export async function listClaims(filter?: {
+  status?: ClaimStatus;
+}): Promise<ClaimRecord[]> {
+  if (!hasDatabaseUrl()) {
+    const db = getMemoryDb() as ServerDb & {
+      claims?: Record<string, ClaimRecord>;
+    };
+    let list = Object.values(db.claims ?? {});
+    if (filter?.status) {
+      list = list.filter((c) => c.status === filter.status);
+    }
+    return list.sort((a, b) => b.claimedAt.localeCompare(a.claimedAt));
+  }
+
+  await ensureSchema();
+  const sql = getSql();
+  const rows = filter?.status
+    ? await sql`
+        SELECT
+          id,
+          cycle_id AS "cycleId",
+          wallet_address AS "walletAddress",
+          pool_id AS "poolId",
+          savings_principal_luna AS "savingsPrincipalLuna",
+          stake_returned_luna AS "stakeReturnedLuna",
+          bonus_from_pool_luna AS "bonusFromPoolLuna",
+          total_luna AS "totalLuna",
+          multiplier,
+          status,
+          claim_ref AS "claimRef",
+          release_tx_hash AS "releaseTxHash",
+          claimed_at AS "claimedAt",
+          paid_at AS "paidAt"
+        FROM claims
+        WHERE status = ${filter.status}
+        ORDER BY claimed_at DESC
+      `
+    : await sql`
+        SELECT
+          id,
+          cycle_id AS "cycleId",
+          wallet_address AS "walletAddress",
+          pool_id AS "poolId",
+          savings_principal_luna AS "savingsPrincipalLuna",
+          stake_returned_luna AS "stakeReturnedLuna",
+          bonus_from_pool_luna AS "bonusFromPoolLuna",
+          total_luna AS "totalLuna",
+          multiplier,
+          status,
+          claim_ref AS "claimRef",
+          release_tx_hash AS "releaseTxHash",
+          claimed_at AS "claimedAt",
+          paid_at AS "paidAt"
+        FROM claims
+        ORDER BY claimed_at DESC
+      `;
+
+  return rows.map(mapClaimRow);
+}
+
+export async function markClaimPaid(
+  claimId: string,
+  releaseTxHash: string
+): Promise<ClaimRecord | null> {
+  const paidAt = new Date().toISOString();
+  if (!hasDatabaseUrl()) {
+    const db = getMemoryDb() as ServerDb & {
+      claims?: Record<string, ClaimRecord>;
+    };
+    const claim = db.claims?.[claimId];
+    if (!claim) return null;
+    claim.status = "paid";
+    claim.releaseTxHash = releaseTxHash;
+    claim.paidAt = paidAt;
+    return claim;
+  }
+
+  await ensureSchema();
+  const sql = getSql();
+  await sql`
+    UPDATE claims
+    SET
+      status = 'paid',
+      release_tx_hash = ${releaseTxHash},
+      paid_at = ${paidAt}
+    WHERE id = ${claimId}
+  `;
+  const rows = await sql`
+    SELECT
+      id,
+      cycle_id AS "cycleId",
+      wallet_address AS "walletAddress",
+      pool_id AS "poolId",
+      savings_principal_luna AS "savingsPrincipalLuna",
+      stake_returned_luna AS "stakeReturnedLuna",
+      bonus_from_pool_luna AS "bonusFromPoolLuna",
+      total_luna AS "totalLuna",
+      multiplier,
+      status,
+      claim_ref AS "claimRef",
+      release_tx_hash AS "releaseTxHash",
+      claimed_at AS "claimedAt",
+      paid_at AS "paidAt"
+    FROM claims
+    WHERE id = ${claimId}
+    LIMIT 1
+  `;
+  if (!rows.length) return null;
+  return mapClaimRow(rows[0]);
+}
+
+function mapClaimRow(row: Record<string, unknown>): ClaimRecord {
+  return {
+    id: String(row.id),
+    cycleId: String(row.cycleId),
+    walletAddress: String(row.walletAddress),
+    poolId: String(row.poolId),
+    savingsPrincipalLuna: Number(row.savingsPrincipalLuna),
+    stakeReturnedLuna: Number(row.stakeReturnedLuna),
+    bonusFromPoolLuna: Number(row.bonusFromPoolLuna),
+    totalLuna: Number(row.totalLuna),
+    multiplier: Number(row.multiplier),
+    status: row.status as ClaimStatus,
+    claimRef: String(row.claimRef),
+    releaseTxHash: row.releaseTxHash
+      ? String(row.releaseTxHash)
+      : undefined,
+    claimedAt:
+      row.claimedAt instanceof Date
+        ? row.claimedAt.toISOString()
+        : String(row.claimedAt),
+    paidAt: row.paidAt
+      ? row.paidAt instanceof Date
+        ? row.paidAt.toISOString()
+        : String(row.paidAt)
+      : undefined,
+  };
+}

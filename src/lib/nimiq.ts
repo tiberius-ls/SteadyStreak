@@ -1,9 +1,11 @@
 "use client";
 
 import { ESCROW_ADDRESS, MOCK_MODE_KEY } from "./constants";
+import { allowDemoWalletClient } from "./demo-policy";
 import { MOCK_ADDRESS_MARKERS } from "./mock-wallet";
 
 export { isMockWalletAddress } from "./mock-wallet";
+export { allowDemoWalletClient } from "./demo-policy";
 
 export type NimiqClient = {
   listAccounts: () => Promise<string[]>;
@@ -123,7 +125,15 @@ export async function connectWallet(options?: {
 }): Promise<NimiqClient> {
   // Inside Nimiq Pay always prefer the real wallet — never stick on old demo mode.
   const inPay = isNimiqPayEnvironment();
-  const forceMock = Boolean(options?.forceMock) || (!inPay && isMockPreferred());
+  const demoAllowed = allowDemoWalletClient();
+  if (options?.forceMock && !demoAllowed) {
+    throw new Error(
+      "Demo wallet is disabled in production. Open SteadyStreak inside Nimiq Pay."
+    );
+  }
+  const forceMock =
+    demoAllowed &&
+    (Boolean(options?.forceMock) || (!inPay && isMockPreferred()));
 
   if (!forceMock && typeof window !== "undefined") {
     try {
@@ -211,7 +221,12 @@ export async function connectWallet(options?: {
     }
   }
 
-  // Mock provider for browser / hackathon demo
+  // Mock provider for browser / local demo only
+  if (!demoAllowed) {
+    throw new Error(
+      "Nimiq Pay wallet not available. Open this mini app inside Nimiq Pay."
+    );
+  }
   setMockPreferred(true);
   const seed =
     typeof window !== "undefined"

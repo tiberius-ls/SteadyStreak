@@ -1,4 +1,9 @@
 import { NextResponse } from "next/server";
+import {
+  assertDurableStore,
+  enforceRateLimit,
+  jsonError,
+} from "@/lib/api-guard";
 import { isMockWalletAddress } from "@/lib/mock-wallet";
 import {
   addForfeit,
@@ -8,17 +13,29 @@ import {
   registerSurvivor,
   storeBackend,
 } from "@/lib/server-store";
-import type { CycleLength } from "@/lib/types";
 import { stakeMultiplier } from "@/lib/streak";
+import {
+  isNonEmptyString,
+  isValidNimiqAddress,
+  parseCycleLength,
+  parseLunaAmount,
+  parseStreak,
+} from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
+  const storeErr = assertDurableStore();
+  if (storeErr) return storeErr;
+
+  const limited = enforceRateLimit(request, "pool-get", 120);
+  if (limited) return limited;
+
   try {
     const { searchParams } = new URL(request.url);
     const poolId = searchParams.get("poolId");
-    if (!poolId) {
-      return NextResponse.json({ error: "poolId required" }, { status: 400 });
+    if (!poolId || !isNonEmptyString(poolId, 80)) {
+      return jsonError("poolId required", 400);
     }
     const pool = await getPool(poolId);
     const survivors = await getSurvivorsForPool(poolId);
@@ -34,41 +51,37 @@ export async function GET(request: Request) {
     });
   } catch (err) {
     console.error("[api/pool GET]", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Server error" },
-      { status: 500 }
+    return jsonError(
+      err instanceof Error ? err.message : "Server error",
+      500
     );
   }
 }
 
 export async function POST(request: Request) {
+  const storeErr = assertDurableStore();
+  if (storeErr) return storeErr;
+
+  const limited = enforceRateLimit(request, "pool-post", 40);
+  if (limited) return limited;
+
   try {
     const body = await request.json();
     const action = body.action as string;
 
     if (action === "forfeit") {
-      const {
-        poolId,
-        cycleLength,
-        cycleId,
-        amountLuna,
-        walletAddress,
-        demo,
-      }: {
-        poolId: string;
-        cycleLength: CycleLength;
-        cycleId: string;
-        amountLuna: number;
-        walletAddress?: string;
-        demo?: boolean;
-      } = body;
-      if (!poolId || !cycleId || !amountLuna) {
-        return NextResponse.json(
-          { error: "poolId, cycleId, amountLuna required" },
-          { status: 400 }
-        );
+      const poolId = String(body.poolId || "").trim();
+      const cycleId = String(body.cycleId || "").trim();
+      const amountLuna = parseLunaAmount(body.amountLuna);
+      if (
+        !isNonEmptyString(poolId, 80) ||
+        !isNonEmptyString(cycleId, 80) ||
+        amountLuna === null ||
+        amountLuna <= 0
+      ) {
+        return jsonError("poolId, cycleId, amountLuna required", 400);
       }
-      if (demo === true || isMockWalletAddress(walletAddress)) {
+      if (body.demo === true || isMockWalletAddress(body.walletAddress)) {
         return NextResponse.json({
           ok: true,
           skipped: true,
@@ -77,71 +90,64 @@ export async function POST(request: Request) {
       }
       const pool = await addForfeit(
         poolId,
-        cycleLength ?? 30,
+        parseCycleLength(body.cycleLength),
         cycleId,
-        Math.floor(amountLuna)
+        amountLuna
       );
       return NextResponse.json({ ok: true, pool, store: storeBackend() });
     }
 
     if (action === "survivor") {
-      const {
-        cycleId,
-        poolId,
-        walletAddress,
-        length,
-        stakeLuna,
-        streakDays,
-        demo,
-      } = body as {
-        cycleId: string;
-        poolId: string;
-        walletAddress: string;
-        length: CycleLength;
-        stakeLuna: number;
-        streakDays: number;
-        demo?: boolean;
-      };
-      if (!cycleId || !poolId || !walletAddress) {
-        return NextResponse.json(
-          { error: "cycleId, poolId, walletAddress required" },
-          { status: 400 }
-        );
+      const cycleId = String(body.cycleId || "").trim();
+      const poolId = String(body.poolId || "").trim();
+      const walletAddress = String(body.walletAddress || "").trim();
+      if (
+        !isNonEmptyString(cycleId, 80) ||
+        !isNonEmptyString(poolId, 80) ||
+        !walletAddress
+      ) {
+        return jsonError("cycleId, poolId, walletAddress required", 400);
       }
-      if (demo === true || isMockWalletAddress(walletAddress)) {
+      if (body.demo === true || isMockWalletAddress(walletAddress)) {
         return NextResponse.json({
           ok: true,
           skipped: true,
           reason: "demo_wallet",
         });
       }
+      if (!isValidNimiqAddress(walletAddress)) {
+        return jsonError("Invalid Nimiq wallet address", 400);
+      }
+      const length = parseCycleLength(body.length);
+      const stakeLuna = parseLunaAmount(body.stakeLuna) ?? 0;
+      const streakDays = parseStreak(body.streakDays) ?? 0;
       await registerSurvivor({
         cycleId,
         poolId,
         walletAddress,
-        length: length ?? 30,
-        stakeLuna: Math.floor(stakeLuna ?? 0),
-        streakDays: Math.floor(streakDays ?? 0),
+        length,
+        stakeLuna,
+        streakDays,
         completed: true,
       });
-      const pool = await getOrCreatePool(poolId, length ?? 30);
+      const pool = await getOrCreatePool(poolId, length);
       return NextResponse.json({ ok: true, pool, store: storeBackend() });
     }
 
     if (action === "payout-preview") {
-      const { poolId, stakeLuna, streakDays, length } = body as {
-        poolId: string;
-        stakeLuna: number;
-        streakDays: number;
-        length: CycleLength;
-      };
+      const poolId = String(body.poolId || "").trim();
+      if (!isNonEmptyString(poolId, 80)) {
+        return jsonError("poolId required", 400);
+      }
+      const stakeLuna = parseLunaAmount(body.stakeLuna) ?? 0;
+      const streakDays = parseStreak(body.streakDays) ?? 0;
+      const length = parseCycleLength(body.length);
       const pool = await getPool(poolId);
       const survivors = await getSurvivorsForPool(poolId);
       const totalForfeited = pool?.totalForfeitedLuna ?? 0;
-      const mult = stakeMultiplier(streakDays, length ?? 30);
+      const mult = stakeMultiplier(streakDays, length);
       const selfWeight = stakeLuna * mult;
 
-      // Include self if not yet registered
       let totalWeight = survivors.reduce((sum, s) => {
         return sum + s.stakeLuna * stakeMultiplier(s.streakDays, s.length);
       }, 0);
@@ -164,12 +170,12 @@ export async function POST(request: Request) {
       });
     }
 
-    return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+    return jsonError("Unknown action", 400);
   } catch (err) {
     console.error("[api/pool POST]", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Server error" },
-      { status: 500 }
+    return jsonError(
+      err instanceof Error ? err.message : "Server error",
+      500
     );
   }
 }

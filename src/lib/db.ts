@@ -54,6 +54,24 @@ const STATEMENTS = [
   )`,
   `CREATE INDEX IF NOT EXISTS survivors_pool_id_idx ON survivors (pool_id)`,
   `CREATE INDEX IF NOT EXISTS leaderboard_streak_idx ON leaderboard (streak DESC)`,
+  `CREATE TABLE IF NOT EXISTS claims (
+    id TEXT PRIMARY KEY,
+    cycle_id TEXT NOT NULL UNIQUE,
+    wallet_address TEXT NOT NULL,
+    pool_id TEXT NOT NULL,
+    savings_principal_luna BIGINT NOT NULL,
+    stake_returned_luna BIGINT NOT NULL,
+    bonus_from_pool_luna BIGINT NOT NULL,
+    total_luna BIGINT NOT NULL,
+    multiplier DOUBLE PRECISION NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    claim_ref TEXT NOT NULL,
+    release_tx_hash TEXT,
+    claimed_at TIMESTAMPTZ NOT NULL,
+    paid_at TIMESTAMPTZ
+  )`,
+  `CREATE INDEX IF NOT EXISTS claims_status_idx ON claims (status)`,
+  `CREATE INDEX IF NOT EXISTS claims_wallet_idx ON claims (wallet_address)`,
 ];
 
 /** Idempotent schema bootstrap (safe to call on every request). */

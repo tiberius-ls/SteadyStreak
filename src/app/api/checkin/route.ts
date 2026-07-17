@@ -1,47 +1,47 @@
 import { NextResponse } from "next/server";
+import {
+  assertDurableStore,
+  enforceRateLimit,
+  jsonError,
+} from "@/lib/api-guard";
 import { isMockWalletAddress } from "@/lib/mock-wallet";
 import {
   removeLeaderboardEntry,
   upsertLeaderboard,
 } from "@/lib/server-store";
 import { tierForStreak } from "@/lib/streak";
-import type { CycleLength, CycleStatus } from "@/lib/types";
+import {
+  isValidNimiqAddress,
+  parseCycleLength,
+  parseCycleStatus,
+  parseStreak,
+  sanitizeHabit,
+} from "@/lib/validation";
 
 export const dynamic = "force-dynamic";
 
 /**
  * Records a confirmed check-in on the public leaderboard (streak only).
  * Savings amounts are never accepted or stored here.
- * Demo / mock wallets are rejected so they never pollute the public board.
  */
 export async function POST(request: Request) {
+  const storeErr = assertDurableStore();
+  if (storeErr) return storeErr;
+
+  const limited = enforceRateLimit(request, "checkin", 40);
+  if (limited) return limited;
+
   try {
     const body = await request.json();
-    const {
-      walletAddress,
-      habit,
-      streak,
-      cycleLength,
-      status,
-      demo,
-    }: {
-      walletAddress: string;
-      habit: string;
-      streak: number;
-      cycleLength: CycleLength;
-      status: CycleStatus;
-      demo?: boolean;
-    } = body;
+    const walletAddress = String(body.walletAddress || "").trim();
+    const streak = parseStreak(body.streak);
+    const demo = body.demo === true;
 
-    if (!walletAddress || typeof streak !== "number") {
-      return NextResponse.json(
-        { error: "walletAddress and streak required" },
-        { status: 400 }
-      );
+    if (!walletAddress || streak === null) {
+      return jsonError("walletAddress and streak required", 400);
     }
 
-    if (demo === true || isMockWalletAddress(walletAddress)) {
-      // Drop any prior pollution for this address
+    if (demo || isMockWalletAddress(walletAddress)) {
       await removeLeaderboardEntry(walletAddress).catch(() => {});
       return NextResponse.json({
         ok: true,
@@ -50,22 +50,26 @@ export async function POST(request: Request) {
       });
     }
 
+    if (!isValidNimiqAddress(walletAddress)) {
+      return jsonError("Invalid Nimiq wallet address", 400);
+    }
+
     const entry = await upsertLeaderboard({
       walletAddress,
-      habit: habit ?? "Habit",
-      streak: Math.max(0, Math.floor(streak)),
-      cycleLength: cycleLength ?? 30,
+      habit: sanitizeHabit(body.habit),
+      streak,
+      cycleLength: parseCycleLength(body.cycleLength),
       tier: tierForStreak(streak),
-      status: status ?? "active",
+      status: parseCycleStatus(body.status),
       updatedAt: new Date().toISOString(),
     });
 
     return NextResponse.json({ ok: true, entry });
   } catch (err) {
     console.error("[api/checkin]", err);
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Server error" },
-      { status: 500 }
+    return jsonError(
+      err instanceof Error ? err.message : "Server error",
+      500
     );
   }
 }
