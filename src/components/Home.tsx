@@ -4,6 +4,7 @@ import { useApp } from "@/context/AppContext";
 import {
   Button,
   Card,
+  DayStrip,
   ErrorBanner,
   Header,
   NavBar,
@@ -62,6 +63,7 @@ export function Home() {
     cycle.status === "completed" ||
     cycle.status === "broken" ||
     cycle.status === "paid_out";
+  const flameCount = Math.min(5, Math.max(1, streak || 1));
 
   return (
     <Shell>
@@ -76,9 +78,25 @@ export function Home() {
 
       <Card className="hero-card">
         <div className="streak-hero">
-          <span className="streak-num">{streak}</span>
-          <span className="streak-label">day streak</span>
+          <div className="streak-row">
+            <span className="streak-num">{streak}</span>
+            <div className="streak-meta">
+              <span className="streak-label">day streak</span>
+              <span className="flame-row" aria-hidden>
+                {Array.from({ length: flameCount }, (_, i) => (
+                  <span key={i}>🔥</span>
+                ))}
+              </span>
+            </div>
+          </div>
         </div>
+
+        <DayStrip
+          length={cycle.length}
+          checkedDays={checkins.map((c) => c.dayNumber)}
+          todayDay={streakInfo?.todayDayNumber ?? null}
+        />
+
         <ProgressBar value={streak} max={cycle.length} />
         <p className="muted small center">
           {remaining > 0
@@ -97,18 +115,22 @@ export function Home() {
               ? "Done for today ✓"
               : cycle.status !== "active"
                 ? "Cycle ended"
-                : "Mark done"}
+                : "Mark done ✓"}
         </Button>
         <p className="muted tiny center">
-          Sends{" "}
+          {canCheckIn
+            ? "Tap to claim today’s streak"
+            : checkedIn
+              ? "You’re good until tomorrow"
+              : "Check-ins send save + stake to escrow"}
+          {client?.isMock ? " · demo mode" : ""}
+        </p>
+        <p className="muted tiny center amount-line">
           <strong>
             {formatNim(cycle.dailySaveLuna + cycle.dailyStakeLuna)} NIM
           </strong>{" "}
           (save {formatNim(cycle.dailySaveLuna)} + stake{" "}
-          {formatNim(cycle.dailyStakeLuna)}) to escrow in one tx.
-          {client?.isMock
-            ? " · demo mode (simulated)"
-            : " · needs enough NIM in this wallet"}
+          {formatNim(cycle.dailyStakeLuna)})
         </p>
         {cycle.status === "active" && !checkedIn ? (
           <p className="reminder">
@@ -129,58 +151,50 @@ export function Home() {
       </Card>
 
       <div className="stat-grid two">
-        <Card>
+        <Card className="stat-card">
           <Stat
             label="Private savings"
             value={`${formatNim(privateSavingsLuna)} NIM`}
             hint="Always returned to you"
           />
         </Card>
-        <Card>
+        <Card className="stat-card">
           <Stat
-            label="Your stake in"
+            label="Your stake"
             value={`${formatNim(privateStakeLuna)} NIM`}
             hint="At risk if streak breaks"
           />
         </Card>
-        <Card>
+        <Card className="stat-card pool-card">
           <Stat
             label="Pool pot"
             value={`${formatNim(poolForfeitLuna)} NIM`}
             hint={
               poolForfeitLuna > 0
-                ? `Forfeits from broken streaks · ${poolSurvivorCount} survivor${
+                ? `Forfeits · ${poolSurvivorCount} survivor${
                     poolSurvivorCount === 1 ? "" : "s"
                   }`
-                : "Grows when others break · survivors split it"
+                : "Grows when others break"
             }
           />
         </Card>
-        <Card>
+        <Card className="stat-card">
           <Stat
             label="Pool rank"
             value={rank ? `#${rank}` : "—"}
             hint="By streak only"
           />
         </Card>
-        <Card>
-          <Stat
-            label="Check-ins"
-            value={`${checkins.length}/${cycle.length}`}
-            hint="Confirmed txs"
-          />
-        </Card>
       </div>
 
-      <Card className="compact">
-        <h2 className="card-title">Your pool cohort</h2>
-        <p className="muted small">
-          Shared stake pot for{" "}
-          <strong>{cycle.length}-day</strong> cycles that started{" "}
-          <strong>{cycle.startDate}</strong>. Broken stakes feed the pot;
-          survivors split it at cycle end (see Payout).
+      <Card className="compact glass">
+        <p className="muted tiny">
+          Escrow · {shortAddress(ESCROW_ADDRESS, 5)}
+          <br />
+          Wallet · {shortAddress(state.user?.walletAddress ?? "", 5)}
+          <br />
+          Pool · {cycle.poolId} · {checkins.length}/{cycle.length} check-ins
         </p>
-        <p className="muted tiny mono">pool · {cycle.poolId}</p>
       </Card>
 
       {checkins.length > 0 ? (
@@ -202,19 +216,7 @@ export function Home() {
         </Card>
       ) : null}
 
-      <Card className="compact">
-        <p className="muted tiny">
-          Escrow · {shortAddress(ESCROW_ADDRESS, 5)}
-          <br />
-          Wallet · {shortAddress(state.user?.walletAddress ?? "", 5)}
-        </p>
-      </Card>
-
-      <NavBar
-        active="home"
-        onNavigate={setScreen}
-        showPayout={showPayout}
-      />
+      <NavBar active="home" onNavigate={setScreen} showPayout={showPayout} />
     </Shell>
   );
 }

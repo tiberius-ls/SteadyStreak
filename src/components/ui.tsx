@@ -7,7 +7,27 @@ export function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="app-shell">
       <div className="app-glow" aria-hidden />
+      <div className="app-mesh" aria-hidden />
       <div className="app-frame">{children}</div>
+    </div>
+  );
+}
+
+export function BrandBar({ right }: { right?: ReactNode }) {
+  return (
+    <div className="brand-bar">
+      <div className="brand-mark">
+        <span className="brand-flame" aria-hidden>
+          🔥
+        </span>
+        <div>
+          <p className="brand-name">
+            Steady<span>Streak</span>
+          </p>
+          <p className="brand-sub">Nimiq Pay mini app</p>
+        </div>
+      </div>
+      {right}
     </div>
   );
 }
@@ -16,20 +36,25 @@ export function Header({
   title,
   subtitle,
   right,
+  showBrand = true,
 }: {
   title: string;
   subtitle?: string;
   right?: ReactNode;
+  showBrand?: boolean;
 }) {
   return (
-    <header className="app-header">
-      <div>
-        <p className="eyebrow">SteadyStreak</p>
-        <h1>{title}</h1>
-        {subtitle ? <p className="muted">{subtitle}</p> : null}
-      </div>
-      {right}
-    </header>
+    <>
+      {showBrand ? <BrandBar right={right} /> : null}
+      <header className="app-header">
+        <div>
+          {!showBrand ? <p className="eyebrow">SteadyStreak</p> : null}
+          <h1>{title}</h1>
+          {subtitle ? <p className="muted header-sub">{subtitle}</p> : null}
+        </div>
+        {!showBrand ? right : null}
+      </header>
+    </>
   );
 }
 
@@ -49,7 +74,7 @@ export function Button({
   className = "",
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "ghost" | "danger";
+  variant?: "primary" | "secondary" | "ghost" | "danger" | "accent";
 }) {
   return (
     <button
@@ -128,6 +153,9 @@ export function NavBar({
         className={active === "home" ? "active" : ""}
         onClick={() => onNavigate("home")}
       >
+        <span className="nav-ico" aria-hidden>
+          🔥
+        </span>
         Home
       </button>
       <button
@@ -135,6 +163,9 @@ export function NavBar({
         className={active === "leaderboard" ? "active" : ""}
         onClick={() => onNavigate("leaderboard")}
       >
+        <span className="nav-ico" aria-hidden>
+          🏆
+        </span>
         Ranks
       </button>
       {showPayout ? (
@@ -143,6 +174,9 @@ export function NavBar({
           className={active === "payout" ? "active" : ""}
           onClick={() => onNavigate("payout")}
         >
+          <span className="nav-ico" aria-hidden>
+            💎
+          </span>
           Payout
         </button>
       ) : null}
@@ -176,5 +210,46 @@ export function Chip({
     >
       {children}
     </button>
+  );
+}
+
+/** Day dots for cycle progress (visual only; data from real check-ins). */
+export function DayStrip({
+  length,
+  checkedDays,
+  todayDay,
+}: {
+  length: number;
+  checkedDays: number[];
+  todayDay: number | null;
+}) {
+  const checked = new Set(checkedDays);
+  // Show a window of up to 7 days around today, or first 7 of cycle
+  const windowSize = Math.min(7, length);
+  let start = 1;
+  if (todayDay != null && length > 7) {
+    start = Math.max(1, Math.min(todayDay - 3, length - 6));
+  }
+  const days = Array.from({ length: windowSize }, (_, i) => start + i).filter(
+    (d) => d <= length
+  );
+
+  return (
+    <div className="day-strip" aria-label="Cycle day progress">
+      {days.map((d) => {
+        const done = checked.has(d);
+        const isToday = todayDay === d;
+        return (
+          <div
+            key={d}
+            className={`day-dot ${done ? "done" : ""} ${isToday ? "today" : ""}`}
+            title={`Day ${d}`}
+          >
+            <span className="day-dot-num">{d}</span>
+            <span className="day-dot-mark">{done ? "✓" : ""}</span>
+          </div>
+        );
+      })}
+    </div>
   );
 }

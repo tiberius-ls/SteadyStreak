@@ -50,17 +50,16 @@ export function Onboarding() {
   return (
     <Shell>
       <Header
-        title="Build habits. Keep your NIM."
-        subtitle="Save safely every day. Stake only what you're willing to risk if the streak breaks."
+        title="Build your streak. Earn real value."
+        subtitle="Daily check-ins. Nimiq Pay. Safe savings + competitive stakes."
       />
       <ErrorBanner message={error} onDismiss={clearError} />
 
-      <Card>
+      <Card className="hero-card onboarding-hero">
         <h2 className="card-title">1. Connect Nimiq wallet</h2>
         <p className="muted small">
-          SteadyStreak runs inside{" "}
-          <strong>Nimiq Pay</strong> and uses real NIM for daily check-ins
-          (save + stake in one transaction).
+          Runs inside <strong>Nimiq Pay</strong>. Each check-in is one real NIM
+          transaction (save + stake).
         </p>
         {connected ? (
           <div className="wallet-pill">
@@ -76,9 +75,15 @@ export function Onboarding() {
           </div>
         ) : (
           <div className="stack-sm">
-            <Button onClick={() => connect(false)} disabled={busy}>
+            <Button
+              variant="accent"
+              className="full"
+              onClick={() => connect(false)}
+              disabled={busy}
+            >
               {busy ? "Connecting…" : "Connect with Nimiq Pay"}
             </Button>
+            <p className="muted tiny center">Link wallet to start earning</p>
             {!inPay && demoAllowed ? (
               <Button
                 variant="secondary"
@@ -164,8 +169,8 @@ export function Onboarding() {
           to you.
         </p>
         <p className="reminder">
-          Soft rule: open the app each day and <strong>Mark done</strong> before
-          local midnight — that&apos;s the whole game.
+          Reminder: midnight check-in required. Streaks break at local midnight
+          if you skip a day — tap <strong>Mark done</strong> every day.
         </p>
       </Card>
 
