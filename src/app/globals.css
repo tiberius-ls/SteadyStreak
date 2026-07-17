@@ -106,16 +106,28 @@ input {
   gap: 10px;
 }
 
-.brand-flame {
+.app-icon {
+  display: block;
+  border-radius: 10px;
+  flex-shrink: 0;
+  object-fit: cover;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.brand-icon {
   width: 40px;
   height: 40px;
   border-radius: 12px;
-  display: grid;
-  place-items: center;
-  font-size: 1.25rem;
-  background: linear-gradient(145deg, rgba(30, 200, 255, 0.25), rgba(255, 210, 74, 0.18));
-  border: 1px solid rgba(30, 200, 255, 0.35);
-  box-shadow: 0 8px 24px rgba(30, 200, 255, 0.15);
+  box-shadow: 0 8px 24px rgba(30, 200, 255, 0.2);
+  border: 1px solid rgba(30, 200, 255, 0.25);
+}
+
+.nav-app-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(30, 200, 255, 0.2);
 }
 
 .brand-name {
@@ -468,9 +480,19 @@ input {
 
 .flame-row {
   display: flex;
-  gap: 2px;
-  font-size: 0.95rem;
-  filter: drop-shadow(0 0 6px rgba(255, 160, 40, 0.45));
+  gap: 3px;
+  align-items: center;
+}
+
+.streak-mini-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  filter: drop-shadow(0 0 6px rgba(30, 200, 255, 0.35));
+}
+
+.streak-flame {
+  display: none;
 }
 
 .amount-line {

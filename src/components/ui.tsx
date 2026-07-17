@@ -13,13 +13,31 @@ export function Shell({ children }: { children: ReactNode }) {
   );
 }
 
+export function AppIcon({
+  size = 40,
+  className = "",
+}: {
+  size?: number;
+  className?: string;
+}) {
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src="/icon.svg"
+      alt=""
+      width={size}
+      height={size}
+      className={`app-icon ${className}`.trim()}
+      draggable={false}
+    />
+  );
+}
+
 export function BrandBar({ right }: { right?: ReactNode }) {
   return (
     <div className="brand-bar">
       <div className="brand-mark">
-        <span className="brand-flame" aria-hidden>
-          🔥
-        </span>
+        <AppIcon size={40} className="brand-icon" />
         <div>
           <p className="brand-name">
             Steady<span>Streak</span>
@@ -153,9 +171,7 @@ export function NavBar({
         className={active === "home" ? "active" : ""}
         onClick={() => onNavigate("home")}
       >
-        <span className="nav-ico" aria-hidden>
-          🔥
-        </span>
+        <AppIcon size={22} className="nav-app-icon" />
         Home
       </button>
       <button

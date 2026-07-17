@@ -47,8 +47,8 @@ export function Leaderboard() {
       <BrandBar />
       <header className="app-header">
         <div>
-          <h1>
-            Leaderboard <span aria-hidden>🔥</span>
+          <h1 className="title-with-icon">
+            Leaderboard
           </h1>
           <p className="muted header-sub">
             Ranked by current streak · savings stay private
@@ -102,13 +102,7 @@ export function Leaderboard() {
                   <p className="muted small">{entry.habit}</p>
                 </div>
                 <div className="rank-streak">
-                  <strong>
-                    {entry.streak}
-                    <span className="streak-flame" aria-hidden>
-                      {" "}
-                      🔥
-                    </span>
-                  </strong>
+                  <strong>{entry.streak}</strong>
                   <span className="tiny">days</span>
                 </div>
               </li>

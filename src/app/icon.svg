@@ -1,19 +1,34 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <rect width="64" height="64" rx="16" fill="#0b1020"/>
-  <rect x="4" y="4" width="56" height="56" rx="14" stroke="#1fa2ff" stroke-width="2" opacity="0.5"/>
-  <path
-    d="M32 12c-2 8 4 10 4 18 0 6-4 10-4 10s-4-4-4-10c0-8 6-10 4-18z"
-    fill="#ffd166"
-  />
-  <path
-    d="M32 22c-1 5 2 6 2 11 0 4-2 7-2 7s-2-3-2-7c0-5 3-6 2-11z"
-    fill="#1fa2ff"
-    opacity="0.9"
-  />
-  <path
-    d="M20 46h24c1 0 2 1 2 2v2c0 1-1 2-2 2H20c-1 0-2-1-2-2v-2c0-1 1-2 2-2z"
-    fill="#3dd68c"
-    opacity="0.95"
-  />
-  <circle cx="32" cy="44" r="3" fill="#f4f7ff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="64" y1="32" x2="448" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1830"/>
+      <stop offset="1" stop-color="#07101F"/>
+    </linearGradient>
+    <linearGradient id="flame" x1="256" y1="96" x2="256" y2="320" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFD24A"/>
+      <stop offset="0.55" stop-color="#FF9F1A"/>
+      <stop offset="1" stop-color="#1EC8FF"/>
+    </linearGradient>
+    <linearGradient id="ring" x1="120" y1="120" x2="392" y2="392" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1EC8FF" stop-opacity="0.9"/>
+      <stop offset="1" stop-color="#1EC8FF" stop-opacity="0.2"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+  <rect x="18" y="18" width="476" height="476" rx="96" stroke="url(#ring)" stroke-width="8" fill="none"/>
+  <!-- base / steady bar -->
+  <rect x="148" y="352" width="216" height="36" rx="18" fill="#3DD68C"/>
+  <circle cx="256" cy="370" r="14" fill="#F2F7FF"/>
+  <!-- flame -->
+  <g filter="url(#glow)">
+    <path d="M256 108c-18 52 28 72 28 124 0 48-28 84-28 84s-28-36-28-84c0-52 46-72 28-124z" fill="url(#flame)"/>
+    <path d="M256 176c-8 32 14 42 14 72 0 28-14 48-14 48s-14-20-14-48c0-30 22-40 14-72z" fill="#1EC8FF" opacity="0.95"/>
+  </g>
 </svg>

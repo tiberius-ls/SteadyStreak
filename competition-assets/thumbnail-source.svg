@@ -4,7 +4,7 @@
       <stop stop-color="#0B1830"/>
       <stop offset="1" stop-color="#07101F"/>
     </linearGradient>
-    <linearGradient id="flame" x1="256" y1="96" x2="256" y2="320" gradientUnits="userSpaceOnUse">
+    <linearGradient id="flame" x1="256" y1="72" x2="256" y2="280" gradientUnits="userSpaceOnUse">
       <stop stop-color="#FFD24A"/>
       <stop offset="0.55" stop-color="#FF9F1A"/>
       <stop offset="1" stop-color="#1EC8FF"/>
@@ -14,7 +14,7 @@
       <stop offset="1" stop-color="#1EC8FF" stop-opacity="0.2"/>
     </linearGradient>
     <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feGaussianBlur stdDeviation="8" result="b"/>
       <feMerge>
         <feMergeNode in="b"/>
         <feMergeNode in="SourceGraphic"/>
@@ -23,12 +23,14 @@
   </defs>
   <rect width="512" height="512" rx="112" fill="url(#bg)"/>
   <rect x="18" y="18" width="476" height="476" rx="96" stroke="url(#ring)" stroke-width="8" fill="none"/>
-  <!-- base / steady bar -->
-  <rect x="148" y="352" width="216" height="36" rx="18" fill="#3DD68C"/>
-  <circle cx="256" cy="370" r="14" fill="#F2F7FF"/>
-  <!-- flame -->
+  <!-- slightly higher composition for wordmark -->
+  <rect x="148" y="318" width="216" height="32" rx="16" fill="#3DD68C"/>
+  <circle cx="256" cy="334" r="12" fill="#F2F7FF"/>
   <g filter="url(#glow)">
-    <path d="M256 108c-18 52 28 72 28 124 0 48-28 84-28 84s-28-36-28-84c0-52 46-72 28-124z" fill="url(#flame)"/>
-    <path d="M256 176c-8 32 14 42 14 72 0 28-14 48-14 48s-14-20-14-48c0-30 22-40 14-72z" fill="#1EC8FF" opacity="0.95"/>
+    <path d="M256 88c-16 46 24 64 24 110 0 42-24 74-24 74s-24-32-24-74c0-46 40-64 24-110z" fill="url(#flame)"/>
+    <path d="M256 148c-7 28 12 37 12 64 0 24-12 42-12 42s-12-18-12-42c0-27 19-36 12-64z" fill="#1EC8FF" opacity="0.95"/>
   </g>
+  <!-- wordmark -->
+  <text x="256" y="420" text-anchor="middle" fill="#F2F7FF" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="48" font-weight="800" letter-spacing="-1">Steady</text>
+  <text x="256" y="468" text-anchor="middle" fill="#1EC8FF" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="48" font-weight="800" letter-spacing="-1">Streak</text>
 </svg>

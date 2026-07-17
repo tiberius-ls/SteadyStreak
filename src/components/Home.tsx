@@ -84,7 +84,15 @@ export function Home() {
               <span className="streak-label">day streak</span>
               <span className="flame-row" aria-hidden>
                 {Array.from({ length: flameCount }, (_, i) => (
-                  <span key={i}>🔥</span>
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    key={i}
+                    src="/icon.svg"
+                    alt=""
+                    width={18}
+                    height={18}
+                    className="streak-mini-icon"
+                  />
                 ))}
               </span>
             </div>
