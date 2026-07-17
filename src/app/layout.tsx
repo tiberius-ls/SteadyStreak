@@ -13,9 +13,12 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SteadyStreak — Habits + Safe NIM Savings",
+  title: {
+    default: "SteadyStreak",
+    template: "%s · SteadyStreak",
+  },
   description:
-    "Nimiq Pay mini app for habit streaks with safe savings and competitive stake pools.",
+    "Habit streaks with safe NIM savings and competitive staking — a Nimiq Pay Mini App.",
   applicationName: "SteadyStreak",
   authors: [{ name: "SteadyStreak" }],
   keywords: [
@@ -26,7 +29,19 @@ export const metadata: Metadata = {
     "staking",
     "savings",
     "NIM",
+    "SteadyStreak",
   ],
+  icons: {
+    icon: [{ url: "/icon.svg", type: "image/svg+xml" }],
+    apple: [{ url: "/icon.svg" }],
+  },
+  openGraph: {
+    title: "SteadyStreak",
+    description:
+      "Build habits. Save NIM safely. Compete with stakes in Nimiq Pay.",
+    type: "website",
+    siteName: "SteadyStreak",
+  },
 };
 
 export const viewport: Viewport = {

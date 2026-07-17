@@ -156,6 +156,7 @@ npm run dev      # development
 npm run build    # production build
 npm run start    # serve production build
 npm run lint     # eslint
+npm test         # unit tests (streak break + payout math)
 ```
 
 ## License

@@ -136,6 +136,10 @@ export function Onboarding() {
           stake for this cycle goes to the shared pool. Savings always return
           to you.
         </p>
+        <p className="reminder">
+          Soft rule: open the app each day and <strong>Mark done</strong> before
+          local midnight — that&apos;s the whole game.
+        </p>
       </Card>
 
       <Button

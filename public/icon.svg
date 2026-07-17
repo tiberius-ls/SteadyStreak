@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="16" fill="#0b1020"/>
+  <rect x="4" y="4" width="56" height="56" rx="14" stroke="#1fa2ff" stroke-width="2" opacity="0.5"/>
+  <!-- flame / streak -->
+  <path
+    d="M32 12c-2 8 4 10 4 18 0 6-4 10-4 10s-4-4-4-10c0-8 6-10 4-18z"
+    fill="#ffd166"
+  />
+  <path
+    d="M32 22c-1 5 2 6 2 11 0 4-2 7-2 7s-2-3-2-7c0-5 3-6 2-11z"
+    fill="#1fa2ff"
+    opacity="0.9"
+  />
+  <!-- steady base -->
+  <path
+    d="M20 46h24c1 0 2 1 2 2v2c0 1-1 2-2 2H20c-1 0-2-1-2-2v-2c0-1 1-2 2-2z"
+    fill="#3dd68c"
+    opacity="0.95"
+  />
+  <circle cx="32" cy="44" r="3" fill="#f4f7ff"/>
+</svg>

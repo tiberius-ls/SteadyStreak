@@ -110,6 +110,12 @@ export function Home() {
             ? " · demo mode (simulated)"
             : " · needs enough NIM in this wallet"}
         </p>
+        {cycle.status === "active" && !checkedIn ? (
+          <p className="reminder">
+            Check in before <strong>midnight local time</strong> or your streak
+            breaks and stake goes to the pool.
+          </p>
+        ) : null}
         {client?.isMock && cycle.status === "active" ? (
           <Button
             variant="ghost"

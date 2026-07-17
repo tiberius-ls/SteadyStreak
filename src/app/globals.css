@@ -492,6 +492,18 @@ input {
   margin-bottom: 6px;
 }
 
+.reminder {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 209, 102, 0.1);
+  border: 1px solid rgba(255, 209, 102, 0.28);
+  color: #ffe6a8;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  text-align: center;
+}
+
 .rank-list {
   display: flex;
   flex-direction: column;
