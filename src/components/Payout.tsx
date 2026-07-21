@@ -86,6 +86,49 @@ export function Payout() {
             </div>
           </Card>
 
+          <Card className="highlight return-card">
+            <h2 className="card-title">Effective return (this cycle)</h2>
+            <div className="stat-grid">
+              <Stat
+                label="You put in"
+                value={`${formatNim(payoutBreakdown.totalContributedLuna)} NIM`}
+                hint="All save + stake check-ins"
+              />
+              <Stat
+                label="You get back"
+                value={`${formatNim(payoutBreakdown.totalLuna)} NIM`}
+                hint="After settlement"
+              />
+              <Stat
+                label="Net"
+                value={`${payoutBreakdown.netProfitLuna >= 0 ? "+" : ""}${formatNim(
+                  payoutBreakdown.netProfitLuna
+                )} NIM`}
+                hint={
+                  payoutBreakdown.netProfitLuna >= 0
+                    ? "Profit this cycle"
+                    : "Loss (forfeited stake)"
+                }
+              />
+              <Stat
+                label="Cycle return"
+                value={`${
+                  payoutBreakdown.effectiveReturnPct >= 0 ? "+" : ""
+                }${payoutBreakdown.effectiveReturnPct.toFixed(1)}%`}
+                hint={`${payoutBreakdown.cycleDays}-day period · not a fixed APR product`}
+              />
+            </div>
+            <p className="muted tiny return-note">
+              Illustrative APR if this pace held:{" "}
+              <strong>
+                {payoutBreakdown.illustrativeAprPct >= 0 ? "+" : ""}
+                {payoutBreakdown.illustrativeAprPct.toFixed(0)}%
+              </strong>
+              . Simple annualization for comparison only — pool bonuses vary
+              and are not guaranteed yield.
+            </p>
+          </Card>
+
           <Card>
             <h2 className="card-title">Stake pool</h2>
             <p className="muted small">

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { calculatePayout, forfeitedStakeLuna } from "./payout";
+import {
+  calculatePayout,
+  computeEffectiveReturn,
+  forfeitedStakeLuna,
+} from "./payout";
 import type { Checkin, Cycle } from "./types";
 
 function makeCycle(
@@ -101,5 +105,54 @@ describe("calculatePayout", () => {
 describe("forfeitedStakeLuna", () => {
   it("sums stake portion of check-ins", () => {
     expect(forfeitedStakeLuna(days(4, 10, 25_000))).toBe(100_000);
+  });
+});
+
+describe("computeEffectiveReturn", () => {
+  it("is zero when payout equals contribution", () => {
+    const r = computeEffectiveReturn({
+      totalContributedLuna: 1_000_000,
+      totalPayoutLuna: 1_000_000,
+      cycleDays: 30,
+    });
+    expect(r.effectiveReturnPct).toBe(0);
+    expect(r.netProfitLuna).toBe(0);
+  });
+
+  it("is negative when broken (stake lost)", () => {
+    // put 150k (100k save + 50k stake), get 100k save only
+    const r = computeEffectiveReturn({
+      totalContributedLuna: 150_000,
+      totalPayoutLuna: 100_000,
+      cycleDays: 5,
+    });
+    expect(r.netProfitLuna).toBe(-50_000);
+    expect(r.effectiveReturnPct).toBeCloseTo((-50_000 / 150_000) * 100, 5);
+  });
+
+  it("is positive with pool bonus", () => {
+    const r = computeEffectiveReturn({
+      totalContributedLuna: 100_000,
+      totalPayoutLuna: 130_000,
+      cycleDays: 30,
+    });
+    expect(r.effectiveReturnPct).toBeCloseTo(30, 5);
+    expect(r.illustrativeAprPct).toBeCloseTo(30 * (365 / 30), 5);
+  });
+});
+
+describe("calculatePayout return metrics", () => {
+  it("attaches negative effective return when broken", () => {
+    const checkins = days(5);
+    const result = calculatePayout({
+      cycle: makeCycle("broken"),
+      checkins,
+      totalForfeitedLuna: 0,
+      survivors: [],
+    });
+    expect(result.broken).toBe(true);
+    expect(result.totalContributedLuna).toBe(5 * 150_000);
+    expect(result.totalLuna).toBe(5 * 100_000);
+    expect(result.effectiveReturnPct).toBeLessThan(0);
   });
 });

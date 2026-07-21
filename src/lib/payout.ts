@@ -22,6 +22,42 @@ export interface SurvivorShareInput {
 }
 
 /**
+ * Realized return for this cycle only (not a product APR).
+ * contributed = all save + stake check-ins
+ * payout = what the user is owed at settlement
+ */
+export function computeEffectiveReturn(params: {
+  totalContributedLuna: number;
+  totalPayoutLuna: number;
+  cycleDays: number;
+}): Pick<
+  PayoutBreakdown,
+  | "totalContributedLuna"
+  | "netProfitLuna"
+  | "effectiveReturnPct"
+  | "illustrativeAprPct"
+  | "cycleDays"
+> {
+  const cycleDays = Math.max(1, Math.floor(params.cycleDays));
+  const totalContributedLuna = Math.max(0, params.totalContributedLuna);
+  const netProfitLuna = params.totalPayoutLuna - totalContributedLuna;
+  const effectiveReturnPct =
+    totalContributedLuna > 0
+      ? (netProfitLuna / totalContributedLuna) * 100
+      : 0;
+  // Simple (non-compound) annualization for comparison only
+  const illustrativeAprPct = effectiveReturnPct * (365 / cycleDays);
+
+  return {
+    totalContributedLuna,
+    netProfitLuna,
+    effectiveReturnPct,
+    illustrativeAprPct,
+    cycleDays,
+  };
+}
+
+/**
  * At cycle end:
  * - Broken users: savings principal only (stake moves to forfeited pool)
  * - Survivors: savings principal + own stake + weighted share of forfeited pool
@@ -33,9 +69,11 @@ export function calculatePayout(input: SurvivorShareInput): PayoutBreakdown {
   const { cycle, checkins, totalForfeitedLuna, survivors } = input;
 
   const savingsPrincipalLuna = checkins.reduce((s, c) => s + c.saveLuna, 0);
-  const ownStakeLuna = checkins.reduce((s, c) => s + c.stakeLuna, 0);
+  const stakeContributedLuna = checkins.reduce((s, c) => s + c.stakeLuna, 0);
+  const totalContributedLuna = savingsPrincipalLuna + stakeContributedLuna;
   const streakDays = checkins.length;
   const multiplier = stakeMultiplier(streakDays, cycle.length);
+  const cycleDays = Math.max(1, streakDays || cycle.length);
 
   const completed =
     cycle.status === "completed" ||
@@ -45,16 +83,22 @@ export function calculatePayout(input: SurvivorShareInput): PayoutBreakdown {
   const broken = cycle.status === "broken" || (!completed && cycle.status !== "active");
 
   if (broken || !completed) {
+    const totalLuna = savingsPrincipalLuna;
     return {
       savingsPrincipalLuna,
       ownStakeLuna: 0,
       bonusFromPoolLuna: 0,
-      totalLuna: savingsPrincipalLuna,
+      totalLuna,
       multiplier: 0,
       totalForfeitedLuna,
       survivorCount: survivors.length,
       completed: false,
       broken: true,
+      ...computeEffectiveReturn({
+        totalContributedLuna,
+        totalPayoutLuna: totalLuna,
+        cycleDays,
+      }),
     };
   }
 
@@ -66,22 +110,31 @@ export function calculatePayout(input: SurvivorShareInput): PayoutBreakdown {
   });
 
   const totalWeight = weights.reduce((a, b) => a + b, 0);
+  const ownStakeLuna = stakeContributedLuna;
   const selfWeight = ownStakeLuna * multiplier;
   const bonusFromPoolLuna =
     totalWeight > 0
       ? Math.floor((totalForfeitedLuna * selfWeight) / totalWeight)
       : 0;
 
+  const totalLuna =
+    savingsPrincipalLuna + ownStakeLuna + bonusFromPoolLuna;
+
   return {
     savingsPrincipalLuna,
     ownStakeLuna,
     bonusFromPoolLuna,
-    totalLuna: savingsPrincipalLuna + ownStakeLuna + bonusFromPoolLuna,
+    totalLuna,
     multiplier,
     totalForfeitedLuna,
     survivorCount: survivors.length,
     completed: true,
     broken: false,
+    ...computeEffectiveReturn({
+      totalContributedLuna,
+      totalPayoutLuna: totalLuna,
+      cycleDays,
+    }),
   };
 }
 

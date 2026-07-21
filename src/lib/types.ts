@@ -90,6 +90,22 @@ export interface PayoutBreakdown {
   survivorCount: number;
   completed: boolean;
   broken: boolean;
+  /** Save + stake sent during the cycle (what you put in). */
+  totalContributedLuna: number;
+  /** totalLuna - totalContributedLuna (can be negative if broken). */
+  netProfitLuna: number;
+  /**
+   * Effective return over this cycle only:
+   * (payout - contributed) / contributed * 100
+   * Not a fixed APR product — realized after the cycle.
+   */
+  effectiveReturnPct: number;
+  /**
+   * Rough annualization of the cycle return for comparison only:
+   * effectiveReturnPct * (365 / cycleDays). Not a yield promise.
+   */
+  illustrativeAprPct: number;
+  cycleDays: number;
 }
 
 export const PRESET_HABITS = [
