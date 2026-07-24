@@ -37,20 +37,66 @@ export function Home() {
     state,
     checkins,
     demoAdvanceDay,
+    startNewCycle,
+    cycleHistory,
   } = useApp();
 
-  const cycle = activeCycle ?? latestCycle;
-  if (!cycle) {
+  const showPayout =
+    latestCycle?.status === "completed" ||
+    latestCycle?.status === "broken" ||
+    latestCycle?.status === "paid_out";
+
+  // No active run — prompt to start; history is preserved
+  if (!activeCycle) {
     return (
       <Shell>
-        <Header title="No active cycle" />
-        <Button className="full" onClick={() => setScreen("onboarding")}>
-          Start a cycle
-        </Button>
+        <Header
+          title="Ready for the next streak?"
+          subtitle={
+            cycleHistory.length
+              ? `${cycleHistory.length} past cycle${
+                  cycleHistory.length === 1 ? "" : "s"
+                } saved on this device.`
+              : "Connect, set amounts, and Mark done every day."
+          }
+        />
+        <Card className="hero-card">
+          <p className="muted small center">
+            Starting a new cycle does <strong>not</strong> erase history.
+            Open History anytime to review returns.
+          </p>
+          <Button className="full mark-done" onClick={() => startNewCycle()}>
+            Start a new cycle
+          </Button>
+          {cycleHistory.length > 0 ? (
+            <Button
+              className="full"
+              variant="secondary"
+              onClick={() => setScreen("history")}
+            >
+              View history
+            </Button>
+          ) : null}
+          {showPayout ? (
+            <Button
+              className="full"
+              variant="ghost"
+              onClick={() => setScreen("payout")}
+            >
+              Open last payout
+            </Button>
+          ) : null}
+        </Card>
+        <NavBar
+          active="home"
+          onNavigate={setScreen}
+          showPayout={showPayout}
+        />
       </Shell>
     );
   }
 
+  const cycle = activeCycle;
   const streak = streakInfo?.currentStreak ?? 0;
   const remaining = daysRemaining(cycle);
   const checkedIn = streakInfo?.checkedInToday ?? false;
@@ -59,10 +105,6 @@ export function Home() {
     !checkedIn &&
     streakInfo?.todayDayNumber != null;
   const tier = tierForStreak(streak);
-  const showPayout =
-    cycle.status === "completed" ||
-    cycle.status === "broken" ||
-    cycle.status === "paid_out";
   const flameCount = Math.min(5, Math.max(1, streak || 1));
 
   return (
@@ -202,6 +244,11 @@ export function Home() {
           Wallet · {shortAddress(state.user?.walletAddress ?? "", 5)}
           <br />
           Pool · {cycle.poolId} · {checkins.length}/{cycle.length} check-ins
+          {cycleHistory.length > 0
+            ? ` · ${cycleHistory.length} past cycle${
+                cycleHistory.length === 1 ? "" : "s"
+              }`
+            : ""}
         </p>
       </Card>
 

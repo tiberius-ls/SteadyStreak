@@ -23,6 +23,7 @@ import {
   checkinsForCycle,
   getActiveCycle,
   getLatestCycle,
+  getPastCycles,
   loadState,
   saveState,
   updateCycle,
@@ -32,11 +33,13 @@ import {
   evaluateStreak,
   formatNim,
   localDateString,
+  lunaToNim,
   makePoolId,
   nimToLuna,
   tierForStreak,
 } from "@/lib/streak";
 import { calculatePayout, forfeitedStakeLuna } from "@/lib/payout";
+import { buildCycleHistory, type CycleHistoryEntry } from "@/lib/history";
 import type {
   AppState,
   Checkin,
@@ -46,13 +49,15 @@ import type {
   PayoutBreakdown,
   User,
 } from "@/lib/types";
+import { PRESET_HABITS } from "@/lib/types";
 
 export type Screen =
   | "onboarding"
   | "setup"
   | "home"
   | "leaderboard"
-  | "payout";
+  | "payout"
+  | "history";
 
 interface AppContextValue {
   ready: boolean;
@@ -110,6 +115,8 @@ interface AppContextValue {
   payoutBreakdown: PayoutBreakdown | null;
   claimPayout: () => Promise<void>;
   startNewCycle: () => void;
+  /** Finished cycles with return stats (device-local history). */
+  cycleHistory: CycleHistoryEntry[];
   /** Demo only: shift cycle start back one day so another check-in is available */
   demoAdvanceDay: () => void;
   shortAddress: typeof shortAddress;
@@ -248,11 +255,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const activeCycle = useMemo(() => getActiveCycle(state), [state]);
   const latestCycle = useMemo(() => getLatestCycle(state), [state]);
+  /** Prefer active run; otherwise latest finished cycle (for payout). */
   const focusCycle = activeCycle ?? latestCycle;
   const checkins = useMemo(
     () => (focusCycle ? checkinsForCycle(state, focusCycle.id) : []),
     [state, focusCycle]
   );
+  const cycleHistory = useMemo(() => buildCycleHistory(state), [state]);
   const streakInfo = useMemo(() => {
     if (!focusCycle) return null;
     return evaluateStreak(focusCycle, checkins);
@@ -415,6 +424,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const confirmSetup = useCallback(async () => {
     if (!state.user) {
       setError("Connect your wallet first");
+      return;
+    }
+    if (getActiveCycle(state)) {
+      setError(
+        "You already have an active cycle. Finish or break it before starting another."
+      );
       return;
     }
     const save = Number(dailySaveNim);
@@ -671,13 +686,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, [focusCycle, payoutBreakdown, isDemoSession]);
 
   const startNewCycle = useCallback(() => {
-    setDraftHabit("Exercise / workout");
-    setCustomHabit("");
-    setDraftLength(30);
-    setDailySaveNim("1");
-    setDailyStakeNim("0.5");
-    setScreen("onboarding");
-  }, []);
+    // Prefill from most recent finished cycle (or any latest); keep all history.
+    const last = getPastCycles(state)[0] ?? getLatestCycle(state);
+    if (last) {
+      const isPreset = (PRESET_HABITS as readonly string[]).includes(
+        last.habit
+      );
+      if (isPreset) {
+        setDraftHabit(last.habit);
+        setCustomHabit("");
+      } else {
+        setDraftHabit("__custom__");
+        setCustomHabit(last.habit);
+      }
+      setDraftLength(last.length);
+      setDailySaveNim(String(lunaToNim(last.dailySaveLuna)));
+      setDailyStakeNim(String(lunaToNim(last.dailyStakeLuna)));
+    } else {
+      setDraftHabit("Exercise / workout");
+      setCustomHabit("");
+      setDraftLength(30);
+      setDailySaveNim("1");
+      setDailyStakeNim("0.5");
+    }
+    // Wallet already connected → jump to amounts; else onboarding
+    setScreen(state.user ? "setup" : "onboarding");
+  }, [state]);
 
   /**
    * Demo helper: move startDate one day earlier so "today" maps to the next
@@ -736,6 +770,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     payoutBreakdown,
     claimPayout,
     startNewCycle,
+    cycleHistory,
     demoAdvanceDay,
     shortAddress,
     formatNim,

@@ -161,7 +161,9 @@ export function NavBar({
   showPayout,
 }: {
   active: string;
-  onNavigate: (s: "home" | "leaderboard" | "payout") => void;
+  onNavigate: (
+    s: "home" | "leaderboard" | "payout" | "history"
+  ) => void;
   showPayout?: boolean;
 }) {
   return (
@@ -183,6 +185,16 @@ export function NavBar({
           🏆
         </span>
         Ranks
+      </button>
+      <button
+        type="button"
+        className={active === "history" ? "active" : ""}
+        onClick={() => onNavigate("history")}
+      >
+        <span className="nav-ico" aria-hidden>
+          📜
+        </span>
+        History
       </button>
       {showPayout ? (
         <button

@@ -6,6 +6,7 @@ import { Setup } from "@/components/Setup";
 import { Home } from "@/components/Home";
 import { Leaderboard } from "@/components/Leaderboard";
 import { Payout } from "@/components/Payout";
+import { History } from "@/components/History";
 
 function Router() {
   const { ready, screen } = useApp();
@@ -30,6 +31,8 @@ function Router() {
       return <Leaderboard />;
     case "payout":
       return <Payout />;
+    case "history":
+      return <History />;
     case "onboarding":
     default:
       return <Onboarding />;

@@ -45,12 +45,9 @@ export function clearState(): void {
   localStorage.removeItem(STORAGE_KEY);
 }
 
+/** Only an in-progress cycle — finished cycles live in history. */
 export function getActiveCycle(state: AppState): Cycle | null {
-  return (
-    state.cycles.find((c) => c.status === "active") ??
-    state.cycles.find((c) => c.status === "completed") ??
-    null
-  );
+  return state.cycles.find((c) => c.status === "active") ?? null;
 }
 
 export function getLatestCycle(state: AppState): Cycle | null {
@@ -58,6 +55,23 @@ export function getLatestCycle(state: AppState): Cycle | null {
   return [...state.cycles].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   )[0];
+}
+
+/** Finished cycles (completed / broken / paid_out), newest first. */
+export function getPastCycles(state: AppState): Cycle[] {
+  return state.cycles
+    .filter((c) => c.status !== "active")
+    .sort(
+      (a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+}
+
+export function payoutForCycle(
+  state: AppState,
+  cycleId: string
+): Payout | null {
+  return state.payouts.find((p) => p.cycleId === cycleId) ?? null;
 }
 
 export function checkinsForCycle(

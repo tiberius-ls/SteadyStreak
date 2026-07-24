@@ -211,11 +211,21 @@ export function Payout() {
         ) : null}
         <Button
           className="full"
-          variant={paid ? "primary" : "secondary"}
+          variant={paid || broken || completed ? "primary" : "secondary"}
           onClick={() => startNewCycle()}
         >
-          Start a new cycle
+          Start next cycle
         </Button>
+        <Button
+          className="full"
+          variant="ghost"
+          onClick={() => setScreen("history")}
+        >
+          View history
+        </Button>
+        <p className="muted tiny center">
+          Next cycle keeps this run in History. Habit and amounts are prefilled.
+        </p>
       </div>
 
       <NavBar active="payout" onNavigate={setScreen} showPayout />
